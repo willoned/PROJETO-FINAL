@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cervejaria MasterView HMI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              brewery: {
+                bg: '#1a110d', // Stout escuro (quase preto)
+                card: '#291d18', // Marrom café
+                border: '#452c20', // Madeira escura
+                text: '#fffbeb', // Espuma (Creme claro)
+                muted: '#d6bbaa', // Bege escuro
+                accent: '#f59e0b', // Âmbar (Cerveja)
+                foam: '#ffffff'
+              }
+            },
+            animation: {
+              'party-glow': 'party-glow 3s infinite alternate',
+              'disco': 'disco 2s infinite',
+              'rise': 'rise 4s infinite ease-in',
+              'fall': 'fall 4s infinite linear',
+            },
+            keyframes: {
+              'party-glow': {
+                '0%': { boxShadow: '0 0 10px #f59e0b, 0 0 20px #ef4444' },
+                '50%': { boxShadow: '0 0 20px #8b5cf6, 0 0 30px #3b82f6' },
+                '100%': { boxShadow: '0 0 10px #10b981, 0 0 20px #f59e0b' },
+              },
+              'disco': {
+                '0%, 100%': { backgroundColor: 'rgba(168, 85, 247, 0.2)' },
+                '25%': { backgroundColor: 'rgba(236, 72, 153, 0.2)' },
+                '50%': { backgroundColor: 'rgba(59, 130, 246, 0.2)' },
+                '75%': { backgroundColor: 'rgba(34, 197, 94, 0.2)' }
+              },
+              'rise': {
+                 '0%': { bottom: '-10%', transform: 'translateX(0)', opacity: '0' },
+                 '20%': { opacity: '0.6' },
+                 '50%': { transform: 'translateX(20px)', opacity: '0.8' },
+                 '80%': { opacity: '0.6' },
+                 '100%': { bottom: '110%', transform: 'translateX(-20px)', opacity: '0' }
+              },
+              'fall': {
+                 '0%': { top: '-10%', transform: 'rotate(0deg)' },
+                 '100%': { top: '110%', transform: 'rotate(360deg)' }
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #1a110d;
+        color: #fffbeb;
+      }
+      /* Custom scrollbar styled for brewery theme */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1a110d; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #452c20; 
+        border-radius: 4px;
+        border: 1px solid #291d18;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #f59e0b; 
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
