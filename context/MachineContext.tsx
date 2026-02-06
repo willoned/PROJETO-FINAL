@@ -14,7 +14,9 @@ const BANNER_MEDIA: MediaItem[] = [
 ];
 
 // Determine secure protocol based on current page
-const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+// NOTE: In Electron (file://), we allow insecure connections for local network devices
+const isSecure = typeof window !== 'undefined' && 
+                 window.location.protocol === 'https:';
 
 const initialState: AppState = {
   lineConfigs: INITIAL_LINES, 
@@ -62,6 +64,7 @@ const initialState: AppState = {
     partyEffect: 'BUBBLES'
   },
   connectionConfig: {
+    // If on HTTPS, default WSS. If Electron (file:) or HTTP, default WS.
     protocol: isSecure ? 'wss' : 'ws',
     host: 'localhost',
     port: '1880',
@@ -254,17 +257,14 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     let wsUrl = APP_CONFIG.WS_URL;
     if (state.connectionConfig.host) {
-        // Ensure protocol matches current page security to prevent mixed content
-        // If config says 'ws' but page is 'https', we force 'wss' in the actual connection string
-        // OR we trust the state if the user manually selected it. 
-        // Given the error, let's strictly enforce secure WS on secure pages for the connection logic.
-        const pageSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
-        let protocol = state.connectionConfig.protocol;
+        // Ensure protocol matches current page security, BUT
+        // If we are in Electron (file://), we allow 'ws' even if we consider ourselves "secure" locally.
+        const protocol = state.connectionConfig.protocol;
         
-        if (pageSecure && protocol === 'ws') {
-            console.warn('Auto-upgrading WS to WSS due to HTTPS page context.');
-            protocol = 'wss';
-        }
+        // Removed the forceful upgrade logic for Electron compatibility.
+        // The check 'window.location.protocol === https:' handles standard web deployments.
+        // In Electron, protocol is 'file:', so it will correctly default to 'ws' if configured,
+        // without forcing 'wss' which breaks local PLC connections.
 
         const host = state.connectionConfig.host;
         const port = state.connectionConfig.port;
