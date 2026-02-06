@@ -13,6 +13,9 @@ const BANNER_MEDIA: MediaItem[] = [
     { id: 'b1', type: 'IMAGE', url: 'https://images.unsplash.com/photo-1571613316887-6f8d5cbf7ef7?auto=format&fit=crop&q=80&w=2000', duration: 20, name: 'Banner Institucional' }
 ];
 
+// Determine secure protocol based on current page
+const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
 const initialState: AppState = {
   lineConfigs: INITIAL_LINES, 
   machines: {},
@@ -59,7 +62,7 @@ const initialState: AppState = {
     partyEffect: 'BUBBLES'
   },
   connectionConfig: {
-    protocol: 'ws',
+    protocol: isSecure ? 'wss' : 'ws',
     host: 'localhost',
     port: '1880',
     path: '/ws/brewery-data',
@@ -74,6 +77,7 @@ type Action =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'ADD_MEDIA'; payload: { key: string; item: MediaItem } }
   | { type: 'REMOVE_MEDIA'; payload: { key: string; id: string } }
+  | { type: 'UPDATE_MEDIA'; payload: { key: string; id: string; data: Partial<MediaItem> } }
   | { type: 'REORDER_MEDIA'; payload: { key: string; startIndex: number; endIndex: number } }
   | { type: 'ADD_ANNOUNCEMENT'; payload: Announcement }
   | { type: 'REMOVE_ANNOUNCEMENT'; payload: string }
@@ -93,6 +97,7 @@ const normalizeData = (rawData: any, config: LineConfig, currentMachineState?: M
     const values = rawData.payload || rawData; 
 
     // Extract values based on user configuration keys
+    // Fallback to defaults or raw keys if mapping is missing
     const temperature = Number(values[mapping.temperatureKey]) || 0;
     
     // Manage Trend History
@@ -126,6 +131,7 @@ function machineReducer(state: AppState, action: Action): AppState {
       let updatedAny = false;
 
       incoming.forEach(msg => {
+          // Identify line by ID or Topic match
           const matchId = msg.id || msg.topic; 
           const config = state.lineConfigs.find(l => l.id === matchId || l.nodeRedTopic === matchId);
 
@@ -168,6 +174,17 @@ function machineReducer(state: AppState, action: Action): AppState {
       return { 
           ...state, 
           playlists: { ...state.playlists, [key]: currentList.filter(i => i.id !== id) } 
+      };
+    }
+    case 'UPDATE_MEDIA': {
+      const { key, id, data } = action.payload;
+      const currentList = state.playlists[key] || [];
+      return {
+          ...state,
+          playlists: {
+              ...state.playlists,
+              [key]: currentList.map(item => item.id === id ? { ...item, ...data } : item)
+          }
       };
     }
     case 'REORDER_MEDIA': {
@@ -237,7 +254,18 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     let wsUrl = APP_CONFIG.WS_URL;
     if (state.connectionConfig.host) {
-        const protocol = state.connectionConfig.protocol;
+        // Ensure protocol matches current page security to prevent mixed content
+        // If config says 'ws' but page is 'https', we force 'wss' in the actual connection string
+        // OR we trust the state if the user manually selected it. 
+        // Given the error, let's strictly enforce secure WS on secure pages for the connection logic.
+        const pageSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+        let protocol = state.connectionConfig.protocol;
+        
+        if (pageSecure && protocol === 'ws') {
+            console.warn('Auto-upgrading WS to WSS due to HTTPS page context.');
+            protocol = 'wss';
+        }
+
         const host = state.connectionConfig.host;
         const port = state.connectionConfig.port;
         const path = state.connectionConfig.path;
@@ -267,6 +295,7 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Updated dispatchers with playlistKey
   const addMedia = (playlistKey: string, item: MediaItem) => dispatch({ type: 'ADD_MEDIA', payload: { key: playlistKey, item } });
   const removeMedia = (playlistKey: string, id: string) => dispatch({ type: 'REMOVE_MEDIA', payload: { key: playlistKey, id } });
+  const updateMedia = (playlistKey: string, id: string, data: Partial<MediaItem>) => dispatch({ type: 'UPDATE_MEDIA', payload: { key: playlistKey, id, data } });
   const reorderMedia = (playlistKey: string, startIndex: number, endIndex: number) => dispatch({ type: 'REORDER_MEDIA', payload: { key: playlistKey, startIndex, endIndex } });
   
   const addAnnouncement = (item: Announcement) => dispatch({ type: 'ADD_ANNOUNCEMENT', payload: item });
@@ -288,6 +317,7 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     isStale,
     addMedia,
     removeMedia,
+    updateMedia,
     reorderMedia,
     addAnnouncement,
     removeAnnouncement,

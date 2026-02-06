@@ -62,7 +62,9 @@ const Header = () => {
         <div className={alignment === 'CENTER' ? 'text-center' : 'text-left'}>
             <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2" style={{ color: textColor }}>
               {layout.isPartyMode ? (
-                  <span className="text-purple-300 drop-shadow-[0_0_5px_rgba(168,85,247,0.8)]">FESTA NA CERVEJARIA</span>
+                  <span className="text-purple-300 drop-shadow-[0_0_5px_rgba(168,85,247,0.8)] uppercase">
+                      {layout.partyMessage || 'FESTA NA CERVEJARIA'}
+                  </span>
               ) : (
                   <span>{title}</span>
               )}

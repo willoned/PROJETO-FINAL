@@ -21,7 +21,8 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
   const startRef = useRef<{ x: number, y: number, w: number, h: number }>({ x: 0, y: 0, w: 0, h: 0 });
 
   // Data defaults - READING MAPPED DATA FROM CONTEXT (Normalization happens in Context)
-  // This ensures specific keys like 'speedKey' configured in settings are already transformed to 'currentHourlyRate' here.
+  // The DataMapping configuration is applied in the MachineContext before data reaches here.
+  // Therefore, 'data.currentHourlyRate' already holds the value from 'speedKey'.
   const status = data?.status || 'MAINTENANCE';
   const count = data?.productionCount || 0;
   const pbValue = data?.efficiency || 0;

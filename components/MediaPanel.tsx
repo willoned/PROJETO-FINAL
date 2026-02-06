@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMachineContext } from '../context/MachineContext';
-import { Upload, Play, Pause, Plus, FileVideo, FileImage, List, X, ArrowUp, ArrowDown, Trash2, FileCode, Globe } from 'lucide-react';
+import { Upload, Play, Pause, Plus, FileVideo, FileImage, List, X, ArrowUp, ArrowDown, Trash2, FileCode, Globe, Timer } from 'lucide-react';
 
 interface Props {
     playlistKey: string;
@@ -17,6 +17,9 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
   
+  // Timer State (Remaining Seconds)
+  const [timeLeft, setTimeLeft] = useState(0);
+
   // Track created URLs to revoke them on unmount to prevent memory leaks
   const createdUrls = useRef<Set<string>>(new Set());
 
@@ -28,9 +31,14 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
     };
   }, []);
 
-  // Playlist Rotation Logic
+  const itemToRender = mediaPlaylist[currentIndex];
+
+  // Logic to handle rotation and countdown
   useEffect(() => {
-    if (!isPlaying || mediaPlaylist.length === 0) return;
+    if (!isPlaying || mediaPlaylist.length === 0 || !itemToRender) {
+        setTimeLeft(0);
+        return;
+    }
 
     // Safety check if index is out of bounds due to deletion
     if (currentIndex >= mediaPlaylist.length) {
@@ -38,19 +46,35 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
       return;
     }
 
-    const item = mediaPlaylist[currentIndex];
-    
-    // If it's a video, we wait for the onEnded event instead of a timer
-    if (item.type === 'VIDEO') return;
+    // VIDEO Logic: Handled by <video onTimeUpdate>
+    if (itemToRender.type === 'VIDEO') {
+        return; 
+    }
 
-    // For Image and HTML, use duration
-    const duration = item.duration * 1000;
-    const timer = setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % mediaPlaylist.length);
-    }, duration);
+    // IMAGE/HTML Logic: Countdown Interval
+    const durationSec = itemToRender.duration;
+    setTimeLeft(durationSec);
 
-    return () => clearTimeout(timer);
-  }, [currentIndex, isPlaying, mediaPlaylist]);
+    const startTime = Date.now();
+    const endTime = startTime + durationSec * 1000;
+
+    const interval = setInterval(() => {
+        const now = Date.now();
+        const remaining = Math.ceil((endTime - now) / 1000);
+        
+        if (remaining <= 0) {
+            clearInterval(interval);
+            // Move to next
+            setCurrentIndex((prev) => (prev + 1) % mediaPlaylist.length);
+        } else {
+            setTimeLeft(remaining);
+        }
+    }, 200); // Check 5 times a second for responsiveness
+
+    return () => {
+        clearInterval(interval);
+    };
+  }, [currentIndex, isPlaying, mediaPlaylist.length, itemToRender]); 
 
   const processFiles = useCallback((files: FileList | null) => {
     if (!files) return;
@@ -127,7 +151,7 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
     );
   }
 
-  const itemToRender = mediaPlaylist[currentIndex] || mediaPlaylist[0];
+  const currentItem = mediaPlaylist[currentIndex] || mediaPlaylist[0];
 
   return (
     <div 
@@ -143,48 +167,67 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         </div>
       )}
 
+      {/* NEW: Top Left Countdown Indicator */}
+      {isPlaying && (
+        <div className="absolute top-4 left-4 z-20 bg-black/60 backdrop-blur-md border border-white/10 rounded-full px-3 py-1 text-xs font-mono font-bold text-white flex items-center gap-2 shadow-lg animate-in fade-in duration-300">
+            <Timer size={12} className="text-brewery-accent" />
+            <span>{timeLeft}s</span>
+        </div>
+      )}
+
       {/* Display Area */}
       <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden w-full h-full">
-        {itemToRender.type === 'HTML' ? (
+        {currentItem.type === 'HTML' ? (
             <iframe 
-                key={itemToRender.id}
-                src={itemToRender.url}
+                key={currentItem.id}
+                src={currentItem.url}
                 className="w-full h-full border-0 bg-white"
                 sandbox="allow-scripts allow-same-origin"
-                title={itemToRender.name}
+                title={currentItem.name}
             />
-        ) : itemToRender.type === 'IMAGE' ? (
+        ) : currentItem.type === 'IMAGE' ? (
           <img 
-            key={itemToRender.id} // Key change forces animation reset
-            src={itemToRender.url} 
-            alt={itemToRender.name} 
+            key={currentItem.id} 
+            src={currentItem.url} 
+            alt={currentItem.name} 
             className={`w-full h-full ${fitClass} animate-in fade-in duration-700`}
           />
         ) : (
           <video 
-            key={itemToRender.id}
-            src={itemToRender.url} 
+            key={currentItem.id}
+            src={currentItem.url} 
             className={`w-full h-full ${fitClass}`}
             autoPlay 
             muted 
             playsInline
-            onEnded={() => setCurrentIndex((prev) => (prev + 1) % mediaPlaylist.length)}
+            onTimeUpdate={(e) => {
+                const v = e.currentTarget;
+                if(v.duration) {
+                    const left = Math.ceil(v.duration - v.currentTime);
+                    // Avoid unnecessary state updates if second hasn't changed
+                    if (left !== timeLeft) setTimeLeft(left);
+                }
+            }}
+            onEnded={() => {
+                setCurrentIndex((prev) => (prev + 1) % mediaPlaylist.length)
+            }}
           />
         )}
         
         {/* Info Overlay */}
-        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 z-10 pointer-events-none transition-opacity duration-300 ${showPlaylist ? 'opacity-0' : 'opacity-100'}`}>
+        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pb-6 z-10 pointer-events-none transition-opacity duration-300 ${showPlaylist ? 'opacity-0' : 'opacity-100'}`}>
           <div className="flex items-center gap-2 mb-2">
-             {itemToRender.type === 'VIDEO' ? <FileVideo size={14} className="text-indigo-400"/> : 
-              itemToRender.type === 'HTML' ? <Globe size={14} className="text-orange-400"/> :
+             {currentItem.type === 'VIDEO' ? <FileVideo size={14} className="text-indigo-400"/> : 
+              currentItem.type === 'HTML' ? <Globe size={14} className="text-orange-400"/> :
               <FileImage size={14} className="text-emerald-400"/>}
-             <p className="text-white font-medium truncate drop-shadow-md text-sm">{itemToRender.name}</p>
+             <p className="text-white font-medium truncate drop-shadow-md text-sm">{currentItem.name}</p>
           </div>
-          <div className="flex gap-1 h-1 bg-zinc-800/50 rounded-full overflow-hidden">
+          {/* Playlist Indicators (Small Dots) */}
+          <div className="flex gap-1 h-1 bg-zinc-800/50 rounded-full overflow-hidden w-1/3 opacity-50">
              {mediaPlaylist.map((item, idx) => (
                <div 
                   key={item.id} 
-                  className={`flex-1 transition-colors duration-300 ${idx === currentIndex ? 'bg-indigo-500' : 'bg-white/10'}`} 
+                  className={`flex-1 transition-colors duration-300 ${idx === currentIndex ? 'bg-white' : 'bg-white/10'}`} 
                />
              ))}
           </div>

@@ -1,3 +1,4 @@
+
 // Visual preferences for what data to show on the card
 export interface DisplayConfig {
   showVolume: boolean;  // Production Count
@@ -180,6 +181,7 @@ export interface AppContextType extends AppState {
   // UPDATED Actions to accept playlistKey
   addMedia: (playlistKey: string, item: MediaItem) => void;
   removeMedia: (playlistKey: string, id: string) => void;
+  updateMedia: (playlistKey: string, id: string, data: Partial<MediaItem>) => void; // NEW: Update duration/props
   reorderMedia: (playlistKey: string, startIndex: number, endIndex: number) => void;
   
   addAnnouncement: (item: Announcement) => void;

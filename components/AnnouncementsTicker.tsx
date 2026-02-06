@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertTriangle, Info, AlertCircle, Megaphone } from 'lucide-react';
 import { Announcement } from '../types';
 import { useMachineContext } from '../context/MachineContext';
@@ -20,6 +20,9 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
   const activeAnnouncements = announcements.filter(a => {
     if (!a.isActive) return false;
     
+    // Only show TICKER mode announcements here, or legacy ones undefined
+    if (a.displayMode && a.displayMode !== 'TICKER') return false;
+
     if (a.schedule) {
         if (a.schedule.start && new Date(a.schedule.start) > now) return false;
         if (a.schedule.end && new Date(a.schedule.end) < now) return false;
@@ -28,7 +31,19 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
     return true;
   });
 
+  // Seamless Loop Logic: Repeat the list multiple times to ensure we can animate smoothly
+  // We repeat 10 times to ensure we cover the screen width and provide a buffer
+  const seamlessList = useMemo(() => {
+      if (activeAnnouncements.length === 0) return [];
+      return Array(10).fill(activeAnnouncements).flat();
+  }, [activeAnnouncements]);
+
   if (activeAnnouncements.length === 0) return null;
+
+  // We animate from 0% to -10% (because we have 10 copies, moving 1 copy width makes it seamless)
+  // The duration is controlled by tickerSpeed. 
+  // We interpret tickerSpeed as "Time to play one full cycle of the original list".
+  const duration = layout.tickerSpeed || 30;
 
   return (
     <div className="bg-brewery-card border-y border-brewery-border overflow-hidden relative h-12 flex items-center group">
@@ -40,19 +55,19 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
         </span>
       </div>
       
-      {/* Gradient Mask */}
+      {/* Gradient Mask for smooth entry under label */}
       <div className="absolute left-20 top-0 bottom-0 w-16 bg-gradient-to-r from-brewery-card to-transparent z-10 pointer-events-none" />
 
-      {/* Animation wrapper - Hardware Accelerated */}
+      {/* Animation wrapper - Seamless Loop */}
       <div 
-        className="flex animate-marquee whitespace-nowrap ml-32 hover:pause will-change-transform"
-        style={{ animationDuration: `${layout.tickerSpeed || 20}s` }}
+        className="flex animate-marquee whitespace-nowrap hover:pause will-change-transform pl-32"
+        style={{ animationDuration: `${duration}s` }}
       >
-        {activeAnnouncements.map((announcement, index) => (
+        {seamlessList.map((announcement, index) => (
           <div 
             key={`${announcement.id}-${index}`} 
             className={`
-              flex items-center mx-12 px-4 py-1 rounded-full transition-all duration-300
+              flex items-center mx-6 px-4 py-1 rounded-full transition-all duration-300
               ${announcement.type === 'ATTENTION' 
                 ? 'bg-gradient-to-r from-orange-600 to-red-600 text-black border-2 border-yellow-400 animate-flash-alert shadow-[0_0_20px_rgba(249,115,22,0.6)]' 
                 : announcement.type === 'CRITICAL' 
@@ -81,8 +96,8 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
 
       <style>{`
         @keyframes marquee {
-          0% { transform: translate3d(100%, 0, 0); }
-          100% { transform: translate3d(-100%, 0, 0); }
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-10%, 0, 0); } /* Move 1/10th of the total width (1 set) */
         }
         
         @keyframes critical-attention {
@@ -141,20 +156,6 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
 
         .hover\\:pause:hover {
           animation-play-state: paused;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .animate-marquee {
-            animation-duration: 60s !important;
-          }
-          .animate-critical-attention, 
-          .animate-warning-float,
-          .animate-flash-alert,
-          .animate-wiggle {
-            animation: none !important;
-            transform: none !important;
-            box-shadow: none !important;
-          }
         }
       `}</style>
     </div>

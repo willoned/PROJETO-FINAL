@@ -15,6 +15,7 @@ class NodeRedService {
   private reconnectTimeout: number | null = null;
   private isIntentionalClose = false;
   private listeners: MessageCallback[] = [];
+  private debugListeners: MessageCallback[] = []; // NEW: Listeners for raw debug data
   private statusListeners: StatusCallback[] = [];
   private errorListeners: ErrorCallback[] = [];
   private url: string;
@@ -43,6 +44,17 @@ class NodeRedService {
       this.listeners = this.listeners.filter(l => l !== onMessage);
       this.statusListeners = this.statusListeners.filter(l => l !== onStatusChange);
       if (onError) this.errorListeners = this.errorListeners.filter(l => l !== onError);
+    };
+  }
+
+  /**
+   * Allow components to subscribe to raw data for debugging purposes
+   * without affecting the main application state logic.
+   */
+  public subscribeDebug(onRawData: MessageCallback) {
+    this.debugListeners.push(onRawData);
+    return () => {
+        this.debugListeners = this.debugListeners.filter(l => l !== onRawData);
     };
   }
 
@@ -80,9 +92,12 @@ class NodeRedService {
         try {
           const data = JSON.parse(event.data);
           this.notifyListeners(data);
+          this.notifyDebug(data); // Notify debuggers
         } catch (e) {
           console.error('[WS] Failed to parse message:', event.data);
           this.notifyError(`Erro ao processar dados JSON: ${e instanceof Error ? e.message : 'Formato inválido'}`);
+          // Also send raw string to debug if JSON parse fails, wrapping it
+          this.notifyDebug({ error: 'JSON Parse Error', raw: event.data });
         }
       };
 
@@ -134,6 +149,10 @@ class NodeRedService {
 
   private notifyListeners(data: any) {
     this.listeners.forEach(l => l(data));
+  }
+
+  private notifyDebug(data: any) {
+    this.debugListeners.forEach(l => l(data));
   }
 
   private notifyStatus(status: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'ERROR') {

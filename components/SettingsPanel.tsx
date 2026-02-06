@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useMachineContext } from '../context/MachineContext';
+import { nodeRedService } from '../services/nodeRedService';
 import { 
   X, Trash2, Plus, Monitor, Bell, LayoutTemplate, Factory, 
   Edit2, Database, Eye,
@@ -7,14 +8,79 @@ import {
   PartyPopper, Calendar, Disc, Sparkles, Wind, Server, CheckCircle, AlertTriangle, RefreshCw,
   ArrowUp, ArrowDown, Crop, Expand, Clock, Type, List, RotateCcw, Gauge, Zap, AlertOctagon, Info, Megaphone,
   Trophy, Medal, Cake, Banknote, Target, Flag, AlignLeft, AlignCenter, Image as ImageIcon, Upload, Scissors,
-  BarChart3, TrendingUp, Scale, Timer, Layers, Maximize
+  BarChart3, TrendingUp, Scale, Timer, Layers, Maximize, Rss, Tv, MousePointer2, Terminal, Pause, Play, Eraser
 } from 'lucide-react';
 import { AnnouncementType, LineConfig } from '../types';
+import { LINE_CONFIGS as DEFAULT_LINES } from '../constants';
+
+// --- HELPER COMPONENTS ---
+
+const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
+      active
+        ? 'bg-brewery-accent text-black shadow-lg shadow-amber-900/20'
+        : 'text-brewery-muted hover:bg-white/5 hover:text-white'
+    }`}
+  >
+    {icon}
+    <span>{label}</span>
+  </button>
+);
+
+const SectionHeader: React.FC<{ title: string; desc: string }> = ({ title, desc }) => (
+  <div className="mb-6 border-b border-brewery-border pb-4">
+    <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
+    <p className="text-brewery-muted mt-1">{desc}</p>
+  </div>
+);
+
+const Badge: React.FC<{ text: string; color?: string }> = ({ text, color }) => {
+    let bgClass = 'bg-white/10 text-brewery-muted border-white/10';
+    if (color === 'blue') bgClass = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    
+    return (
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${bgClass}`}>
+            {text}
+        </span>
+    );
+};
+
+const Toggle: React.FC<{ checked: boolean; onChange: () => void; color?: string }> = ({ checked, onChange, color }) => (
+  <div 
+    onClick={onChange}
+    className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors duration-300 ${checked ? (color === 'purple' ? 'bg-purple-600' : 'bg-brewery-accent') : 'bg-black border border-white/20'}`}
+  >
+    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300 ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
+  </div>
+);
+
+const EffectCard: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string; description: string }> = ({ active, onClick, icon, label, description }) => (
+  <div 
+    onClick={onClick}
+    className={`cursor-pointer rounded-lg border p-3 flex flex-col gap-2 transition-all hover:scale-105 active:scale-95 ${
+        active 
+        ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/40 ring-2 ring-purple-300' 
+        : 'bg-black/40 border-purple-500/20 text-purple-300 hover:bg-purple-900/20'
+    }`}
+  >
+    <div className={`p-2 rounded-full w-fit transition-colors ${active ? 'bg-white/20' : 'bg-black/20'}`}>
+        {icon}
+    </div>
+    <div>
+        <span className="text-xs font-bold block">{label}</span>
+        <span className={`text-[9px] leading-tight block mt-0.5 ${active ? 'text-purple-100' : 'text-purple-400/60'}`}>{description}</span>
+    </div>
+  </div>
+);
+
+// --- MAIN COMPONENT ---
 
 const SettingsPanel: React.FC = () => {
   const { 
     showSettings, toggleSettings, 
-    playlists, removeMedia, reorderMedia,
+    playlists, removeMedia, reorderMedia, updateMedia,
     announcements, addAnnouncement, removeAnnouncement,
     layout, updateLayout,
     lineConfigs, addLine, removeLine, updateLine,
@@ -43,6 +109,38 @@ const SettingsPanel: React.FC = () => {
 
   // Background Removal State
   const [isProcessingBg, setIsProcessingBg] = useState(false);
+
+  // DEBUG CONSOLE STATE
+  const [consoleLogs, setConsoleLogs] = useState<{time: string, data: any}[]>([]);
+  const [isLogPaused, setIsLogPaused] = useState(false);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Effect to scroll to bottom of logs
+  useEffect(() => {
+    if (!isLogPaused && logsEndRef.current) {
+        logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [consoleLogs, isLogPaused]);
+
+  // Subscribe to raw data when in API tab
+  useEffect(() => {
+    if (activeTab === 'API') {
+        const cleanup = nodeRedService.subscribeDebug((data) => {
+            if (!isLogPaused) {
+                setConsoleLogs(prev => {
+                    const newLog = { 
+                        time: new Date().toLocaleTimeString(), 
+                        data 
+                    };
+                    // Keep last 30 logs to avoid memory issues
+                    return [...prev.slice(-29), newLog];
+                });
+            }
+        });
+        return cleanup;
+    }
+  }, [activeTab, isLogPaused]);
+
 
   if (!showSettings) return null;
 
@@ -97,9 +195,21 @@ const SettingsPanel: React.FC = () => {
 
   const resetLayoutPositions = () => {
     if(confirm('Isso irá resetar a posição de todos os cards, logo e da janela de mídia. Continuar?')) {
+        // 1. Reset Global UI Elements
         updateLayout({ 
-            mediaWindow: { x: 50, y: 150, w: 400, h: 300 },
+            mediaWindow: { x: 800, y: 350, w: 400, h: 300 },
             logoWidget: { ...layout.logoWidget, x: 20, y: 20, w: 120, h: 120 }
+        });
+
+        // 2. Reset All Machines to Default Constants
+        lineConfigs.forEach(line => {
+            const def = DEFAULT_LINES.find(d => d.id === line.id);
+            if (def) {
+                updateLine(line.id, { x: def.x, y: def.y, w: def.w, h: def.h });
+            } else {
+                // Cascading fallback for new lines created by user
+                updateLine(line.id, { x: 50, y: 50 });
+            }
         });
     }
   };
@@ -405,152 +515,402 @@ const SettingsPanel: React.FC = () => {
                     </div>
                  )}
 
-                {/* --- TAB: ALERTS (OPTIMIZED) --- */}
-                {activeTab === 'ALERTS' && (
-                    <div className="space-y-8 max-w-3xl mx-auto">
-                        <SectionHeader title="Mural de Avisos" desc="Gerencie comunicados e alertas para o chão de fábrica." />
-                        
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6">
-                            <h3 className="font-bold text-brewery-text mb-4">Novo Aviso</h3>
-                             <form onSubmit={(e) => {
-                                 e.preventDefault();
-                                 if(!newMsg) return;
-                                 addAnnouncement({ 
-                                    id: Date.now().toString(), 
-                                    message: newMsg, 
-                                    type: newType, 
-                                    displayMode: isOverlay ? 'OVERLAY' : 'TICKER', // NEW
-                                    isActive: true,
-                                    schedule: (scheduleStart || scheduleEnd) ? {
-                                        start: scheduleStart || undefined,
-                                        end: scheduleEnd || undefined
-                                    } : undefined
-                                 });
-                                 setNewMsg('');
-                                 setScheduleStart('');
-                                 setScheduleEnd('');
-                                 setNewType('INFO');
-                                 setIsOverlay(false);
-                             }} className="space-y-6">
-                                 
-                                 {/* Type Selection - Visual Badges */}
-                                 <div>
-                                     <label className="label-pro mb-3">Tipo de Comunicado</label>
-                                     <div className="flex flex-wrap gap-3">
-                                        {[
-                                            { id: 'INFO', label: 'Informativo', color: 'bg-blue-600', icon: <Info size={14}/> },
-                                            { id: 'WARNING', label: 'Alerta', color: 'bg-amber-600', icon: <AlertTriangle size={14}/> },
-                                            { id: 'CRITICAL', label: 'Crítico', color: 'bg-rose-600', icon: <AlertOctagon size={14}/> },
-                                            { id: 'ATTENTION', label: 'Evento', color: 'bg-orange-500 text-black', icon: <PartyPopper size={14}/> },
-                                        ].map(t => (
-                                            <button
-                                                key={t.id}
-                                                type="button"
-                                                onClick={() => setNewType(t.id as any)}
-                                                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all transform ${newType === t.id ? `${t.color} scale-105 shadow-lg` : 'bg-black border border-white/10 text-brewery-muted hover:border-white/30'}`}
-                                            >
-                                                {t.icon} {t.label}
-                                            </button>
-                                        ))}
-                                     </div>
-                                 </div>
+                {/* --- TAB: API CONNECTION --- */}
+                {activeTab === 'API' && (
+                    <div className="space-y-6 max-w-3xl mx-auto">
+                        <SectionHeader title="Conexão Industrial" desc="Configuração do protocolo WebSocket/MQTT para o chão de fábrica." />
 
-                                 {/* Overlay Toggle */}
-                                 <div className="flex justify-between items-center bg-black/30 p-3 rounded border border-white/5">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`p-2 rounded ${isOverlay ? 'bg-rose-500 text-white' : 'bg-white/10 text-brewery-muted'}`}>
-                                            <Maximize size={18} />
-                                        </div>
-                                        <div>
-                                            <span className="block text-sm font-bold text-white">Exibir como Pop-up Central</span>
-                                            <span className="block text-[10px] text-brewery-muted">O aviso aparecerá grande no meio da tela, bloqueando a visão.</span>
-                                        </div>
-                                    </div>
-                                    <Toggle checked={isOverlay} onChange={() => setIsOverlay(!isOverlay)} />
-                                 </div>
-
-                                 <div>
-                                     <label className="label-pro">Mensagem</label>
-                                     <input 
-                                        className="input-pro text-lg h-12" 
-                                        placeholder="Digite a mensagem que aparecerá no rodapé ou centro..." 
-                                        value={newMsg} 
-                                        onChange={e => setNewMsg(e.target.value)} 
-                                        required 
+                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 space-y-6">
+                            
+                            {/* Protocol & Host */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div className="col-span-1">
+                                    <label className="label-pro">Protocolo</label>
+                                    <select 
+                                        className="input-pro"
+                                        value={connectionConfig.protocol}
+                                        onChange={(e) => updateConnectionConfig({ protocol: e.target.value as 'ws' | 'wss' })}
+                                    >
+                                        <option value="ws">WS://</option>
+                                        <option value="wss">WSS:// (Secure)</option>
+                                    </select>
+                                </div>
+                                <div className="col-span-1 md:col-span-3">
+                                    <label className="label-pro">Host / IP do Servidor</label>
+                                    <input 
+                                        className="input-pro font-mono"
+                                        placeholder="localhost ou 192.168.1.50"
+                                        value={connectionConfig.host}
+                                        onChange={(e) => updateConnectionConfig({ host: e.target.value })}
                                     />
-                                 </div>
+                                </div>
+                            </div>
 
-                                 {/* Scheduling Inputs */}
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-black/20 rounded border border-white/5">
-                                    <div>
-                                        <label className="label-pro text-[10px] flex items-center gap-1"><Clock size={12}/> Início (Opcional)</label>
-                                        <input 
-                                            type="datetime-local" 
-                                            className="input-pro text-xs text-brewery-muted"
-                                            value={scheduleStart}
-                                            onChange={(e) => setScheduleStart(e.target.value)}
-                                        />
+                            {/* Port & Path */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div className="col-span-1">
+                                    <label className="label-pro">Porta</label>
+                                    <input 
+                                        className="input-pro font-mono"
+                                        placeholder="1880"
+                                        value={connectionConfig.port}
+                                        onChange={(e) => updateConnectionConfig({ port: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-1 md:col-span-3">
+                                    <label className="label-pro">Caminho (Path/Topic)</label>
+                                    <input 
+                                        className="input-pro font-mono"
+                                        placeholder="/ws/brewery-data"
+                                        value={connectionConfig.path}
+                                        onChange={(e) => updateConnectionConfig({ path: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Authentication */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                <div className="col-span-1">
+                                    <label className="label-pro">Usuário (Opcional)</label>
+                                    <input 
+                                        className="input-pro"
+                                        placeholder="admin"
+                                        value={connectionConfig.username || ''}
+                                        onChange={(e) => updateConnectionConfig({ username: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-1">
+                                    <label className="label-pro">Senha (Opcional)</label>
+                                    <input 
+                                        type="password"
+                                        className="input-pro"
+                                        placeholder="••••••"
+                                        value={connectionConfig.password || ''}
+                                        onChange={(e) => updateConnectionConfig({ password: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="border-t border-brewery-border my-2"></div>
+
+                            {/* Status & Actions */}
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${connectionConfig.autoConnect ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                    <span className="text-sm font-bold text-brewery-muted">Conexão Automática {connectionConfig.autoConnect ? 'Ativada' : 'Desativada'}</span>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={handleTestConnection}
+                                        disabled={testStatus === 'TESTING'}
+                                        className={`btn-ghost border border-white/10 ${
+                                            testStatus === 'SUCCESS' ? 'text-emerald-400 border-emerald-500/50' : 
+                                            testStatus === 'ERROR' ? 'text-rose-500 border-rose-500/50' : ''
+                                        }`}
+                                    >
+                                        {testStatus === 'TESTING' ? <RefreshCw className="animate-spin" size={18} /> : 
+                                         testStatus === 'SUCCESS' ? <CheckCircle size={18} /> : 
+                                         testStatus === 'ERROR' ? <AlertTriangle size={18} /> : 
+                                         <Activity size={18} />}
+                                        <span className="ml-2">{
+                                            testStatus === 'TESTING' ? 'Testando...' : 
+                                            testStatus === 'SUCCESS' ? 'Conexão OK' : 
+                                            testStatus === 'ERROR' ? 'Falha' : 
+                                            'Testar Conexão'
+                                        }</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* --- DEBUG CONSOLE (NEW) --- */}
+                        <div className="bg-black/95 border border-brewery-border rounded-lg overflow-hidden flex flex-col shadow-inner h-[300px]">
+                            {/* Terminal Header */}
+                            <div className="flex justify-between items-center bg-zinc-900/50 p-2 border-b border-white/10">
+                                <div className="flex items-center gap-2 px-2">
+                                    <Terminal size={14} className="text-emerald-400" />
+                                    <span className="text-xs font-mono font-bold text-zinc-300">RECEBIMENTO DE DADOS EM TEMPO REAL</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => setIsLogPaused(!isLogPaused)} 
+                                        className={`p-1.5 rounded hover:bg-white/10 transition-colors ${isLogPaused ? 'text-amber-400 bg-amber-900/20' : 'text-zinc-400'}`}
+                                        title={isLogPaused ? "Resumir" : "Pausar"}
+                                    >
+                                        {isLogPaused ? <Play size={14} /> : <Pause size={14} />}
+                                    </button>
+                                    <button 
+                                        onClick={() => setConsoleLogs([])} 
+                                        className="p-1.5 rounded text-zinc-400 hover:text-rose-400 hover:bg-white/10 transition-colors"
+                                        title="Limpar Console"
+                                    >
+                                        <Eraser size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Terminal Body */}
+                            <div className="flex-1 overflow-y-auto p-4 font-mono text-[10px] md:text-xs space-y-2 custom-scrollbar">
+                                {consoleLogs.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2">
+                                        <Activity size={24} className="opacity-50" />
+                                        <p>Aguardando dados do WebSocket...</p>
                                     </div>
-                                    <div>
-                                        <label className="label-pro text-[10px] flex items-center gap-1"><Clock size={12}/> Fim (Opcional)</label>
-                                        <input 
-                                            type="datetime-local" 
-                                            className="input-pro text-xs text-brewery-muted"
-                                            value={scheduleEnd}
-                                            onChange={(e) => setScheduleEnd(e.target.value)}
-                                        />
+                                ) : (
+                                    consoleLogs.map((log, i) => (
+                                        <div key={i} className="animate-in fade-in slide-in-from-left-2 duration-200">
+                                            <span className="text-zinc-500 mr-2">[{log.time}]</span>
+                                            <span className="text-emerald-500 font-bold mr-2">&gt;</span>
+                                            <span className="text-zinc-300 whitespace-pre-wrap break-all">{JSON.stringify(log.data)}</span>
+                                        </div>
+                                    ))
+                                )}
+                                <div ref={logsEndRef} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- TAB: MEDIA & MENU --- */}
+                {activeTab === 'MEDIA' && (
+                    <div className="space-y-6 max-w-3xl mx-auto">
+                        <SectionHeader title="Gestão de Mídia" desc="Gerencie imagens e vídeos exibidos nos players." />
+
+                        {/* Playlist Selection */}
+                        <div className="flex gap-4 mb-6">
+                            <button 
+                                onClick={() => setSelectedPlaylist('floating')}
+                                className={`flex-1 py-4 px-6 rounded-lg border flex flex-col items-center gap-2 transition-all ${selectedPlaylist === 'floating' ? 'bg-brewery-accent text-black border-transparent shadow-lg' : 'bg-brewery-card border-brewery-border text-brewery-muted hover:border-brewery-muted'}`}
+                            >
+                                <Monitor size={24} />
+                                <span className="font-bold uppercase tracking-wider text-xs">Janela Flutuante</span>
+                            </button>
+                            <button 
+                                onClick={() => setSelectedPlaylist('banner')}
+                                className={`flex-1 py-4 px-6 rounded-lg border flex flex-col items-center gap-2 transition-all ${selectedPlaylist === 'banner' ? 'bg-brewery-accent text-black border-transparent shadow-lg' : 'bg-brewery-card border-brewery-border text-brewery-muted hover:border-brewery-muted'}`}
+                            >
+                                <Tv size={24} />
+                                <span className="font-bold uppercase tracking-wider text-xs">Banner Superior</span>
+                            </button>
+                        </div>
+
+                        {/* Media List */}
+                        <div className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden flex flex-col h-[400px]">
+                            <div className="p-4 bg-black/20 border-b border-brewery-border flex justify-between items-center">
+                                <span className="text-xs font-bold text-brewery-muted uppercase">Itens da Playlist ({currentMediaList.length})</span>
+                                {/* Note: Adding files is done via the specific MediaPanel on the HUD for drag-drop convenience, 
+                                    but we could add a button here too if needed. */}
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                                {currentMediaList.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-brewery-muted opacity-50">
+                                        <Monitor size={48} className="mb-2"/>
+                                        <p>Nenhuma mídia nesta playlist</p>
                                     </div>
-                                 </div>
-                                 
-                                 <button type="submit" className="btn-primary w-full py-3 text-sm">
-                                    <Plus size={18} className="mr-2" /> Publicar Aviso
-                                 </button>
-
-                             </form>
-
-                             <div className="mt-8 border-t border-brewery-border pt-6">
-                                <h4 className="text-xs font-bold text-brewery-muted uppercase mb-4">Avisos Ativos ({announcements.length})</h4>
-                                <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
-                                    {announcements.map(ann => {
-                                        const now = new Date();
-                                        const start = ann.schedule?.start ? new Date(ann.schedule.start) : null;
-                                        const end = ann.schedule?.end ? new Date(ann.schedule.end) : null;
-                                        
-                                        const isScheduledFuture = start && start > now;
-                                        const isExpired = end && end < now;
-
-                                        return (
-                                        <div key={ann.id} className={`flex items-center justify-between p-3 bg-black/40 border rounded-lg transition-all ${isExpired ? 'opacity-40 border-dashed border-white/10' : 'border-white/10 hover:border-brewery-accent/50'}`}>
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`w-2 h-2 rounded-full ${
-                                                        ann.type === 'ATTENTION' ? 'bg-orange-500' :
-                                                        ann.type === 'CRITICAL' ? 'bg-rose-500' : 
-                                                        ann.type === 'WARNING' ? 'bg-amber-500' : 'bg-blue-500'
-                                                    }`} />
-                                                    <span className={`text-brewery-text text-sm font-medium ${isExpired ? 'line-through' : ''}`}>{ann.message}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 pl-5 mt-1">
-                                                    {ann.schedule && (
-                                                        <div className="text-[10px] text-brewery-muted flex gap-2">
-                                                            {isScheduledFuture && <span className="text-blue-400 bg-blue-400/10 px-1 rounded">Agendado</span>}
-                                                            {isExpired && <span className="text-rose-400 bg-rose-400/10 px-1 rounded">Expirado</span>}
-                                                            {(!isScheduledFuture && !isExpired) && <span className="text-emerald-400 bg-emerald-400/10 px-1 rounded">No Ar</span>}
+                                ) : (
+                                    currentMediaList.map((item, idx) => (
+                                        <div key={item.id} className="flex items-center gap-4 p-3 rounded bg-black/40 border border-white/5 group hover:border-white/10 transition-colors">
+                                            <div className="w-10 h-10 bg-black rounded overflow-hidden flex items-center justify-center text-brewery-muted shrink-0">
+                                                {item.type === 'IMAGE' ? <ImageIcon size={20} /> : <Monitor size={20} />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm text-white truncate">{item.name}</p>
+                                                <div className="flex gap-2 text-[10px] text-brewery-muted uppercase items-center">
+                                                    <span>{item.type}</span>
+                                                    {item.type !== 'VIDEO' && (
+                                                        <div className="flex items-center gap-1 bg-black/40 rounded px-2 py-0.5 border border-white/10 ml-2 group-hover:border-white/30 transition-colors">
+                                                            <Clock size={10} className="text-brewery-muted" />
+                                                            <input 
+                                                                type="number" 
+                                                                min="1" 
+                                                                value={item.duration} 
+                                                                onChange={(e) => updateMedia(selectedPlaylist, item.id, { duration: Math.max(1, Number(e.target.value)) })}
+                                                                className="w-8 bg-transparent text-[10px] text-white text-center focus:outline-none appearance-none font-mono font-bold"
+                                                            />
+                                                            <span className="text-[9px] text-brewery-muted">seg</span>
                                                         </div>
-                                                    )}
-                                                    {ann.displayMode === 'OVERLAY' && (
-                                                        <span className="text-[10px] font-bold text-white bg-rose-600 px-1.5 rounded flex items-center gap-1"><Maximize size={10} /> POP-UP</span>
                                                     )}
                                                 </div>
                                             </div>
-                                            <button onClick={() => removeAnnouncement(ann.id)} className="p-2 text-brewery-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-full transition"><Trash2 size={16}/></button>
+                                            <div className="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => idx > 0 && reorderMedia(selectedPlaylist, idx, idx-1)} className="p-2 hover:bg-white/10 rounded disabled:opacity-20" disabled={idx === 0}><ArrowUp size={16}/></button>
+                                                <button onClick={() => idx < currentMediaList.length-1 && reorderMedia(selectedPlaylist, idx, idx+1)} className="p-2 hover:bg-white/10 rounded disabled:opacity-20" disabled={idx === currentMediaList.length-1}><ArrowDown size={16}/></button>
+                                                <button onClick={() => removeMedia(selectedPlaylist, item.id)} className="p-2 hover:bg-rose-950 text-rose-500 rounded ml-2"><Trash2 size={16}/></button>
+                                            </div>
                                         </div>
-                                    )})}
-                                    {announcements.length === 0 && (
-                                        <div className="text-center text-brewery-muted text-sm py-4 italic">Nenhum aviso cadastrado.</div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- TAB: GENERAL ALERTS --- */}
+                {activeTab === 'ALERTS' && (
+                    <div className="space-y-6 max-w-3xl mx-auto">
+                        <SectionHeader title="Avisos Gerais" desc="Mensagens importantes, alertas de segurança e comunicados." />
+
+                        {/* New Alert Form */}
+                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 space-y-4 shadow-lg relative overflow-hidden">
+                            <div className="flex flex-col md:flex-row gap-4">
+                                <div className="flex-1">
+                                    <label className="label-pro">Mensagem</label>
+                                    <input 
+                                        className="input-pro h-12 text-lg" 
+                                        placeholder="Ex: Reunião geral às 14h" 
+                                        value={newMsg}
+                                        onChange={(e) => setNewMsg(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && newMsg) {
+                                                addAnnouncement({ id: Date.now().toString(), message: newMsg, type: newType, displayMode: isOverlay ? 'OVERLAY' : 'TICKER', isActive: true });
+                                                setNewMsg('');
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <div className="w-full md:w-48">
+                                    <label className="label-pro">Tipo</label>
+                                    <select 
+                                        className="input-pro h-12"
+                                        value={newType}
+                                        onChange={(e) => setNewType(e.target.value as AnnouncementType)}
+                                    >
+                                        <option value="INFO">Informação</option>
+                                        <option value="WARNING">Aviso</option>
+                                        <option value="CRITICAL">Crítico</option>
+                                        <option value="ATTENTION">Atenção</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Scheduling */}
+                            <div className="grid grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <label className="label-pro">Início (Opcional)</label>
+                                    <input type="datetime-local" className="input-pro" value={scheduleStart} onChange={(e) => setScheduleStart(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="label-pro">Fim (Opcional)</label>
+                                    <input type="datetime-local" className="input-pro" value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)} />
+                                </div>
+                            </div>
+                            
+                            <div className="flex justify-between items-center pt-2">
+                                <div className="flex items-center gap-3 bg-black/30 px-3 py-2 rounded-lg border border-white/5">
+                                    <Toggle checked={isOverlay} onChange={() => setIsOverlay(!isOverlay)} />
+                                    <div>
+                                        <span className="text-sm font-bold block text-white">{isOverlay ? 'Modo Overlay (Tela Cheia)' : 'Modo Ticker (Rodapé)'}</span>
+                                        <span className="text-[10px] text-brewery-muted block">{isOverlay ? 'Interrompe a visualização com pop-up' : 'Passa texto na barra inferior'}</span>
+                                    </div>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => {
+                                        if(newMsg) {
+                                            addAnnouncement({ 
+                                                id: Date.now().toString(), 
+                                                message: newMsg, 
+                                                type: newType, 
+                                                displayMode: isOverlay ? 'OVERLAY' : 'TICKER', 
+                                                isActive: true,
+                                                schedule: scheduleStart || scheduleEnd ? {
+                                                    start: scheduleStart || undefined,
+                                                    end: scheduleEnd || undefined
+                                                } : undefined
+                                            });
+                                            setNewMsg('');
+                                            setScheduleStart('');
+                                            setScheduleEnd('');
+                                        }
+                                    }}
+                                    className="btn-primary px-8 h-12"
+                                >
+                                    Adicionar Aviso
+                                </button>
+                            </div>
+
+                            {/* ANIMATED PREVIEW */}
+                            {newMsg && (
+                                <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2">
+                                    <label className="label-pro mb-2 flex items-center gap-2 text-indigo-400"><Eye size={12}/> Pré-visualização em tempo real</label>
+                                    
+                                    {isOverlay ? (
+                                        <div className="w-full aspect-[21/9] bg-black/80 rounded-lg flex items-center justify-center border-4 relative overflow-hidden transition-all duration-300 transform scale-95"
+                                             style={{
+                                                 borderColor: newType === 'CRITICAL' ? '#f43f5e' : newType === 'WARNING' ? '#f59e0b' : newType === 'ATTENTION' ? '#f97316' : '#3b82f6',
+                                                 boxShadow: newType === 'CRITICAL' ? '0 0 20px rgba(244,63,94,0.4)' : 'none'
+                                             }}
+                                        >
+                                            <div className={`text-center space-y-2 ${newType === 'CRITICAL' ? 'animate-pulse' : ''}`}>
+                                                {newType === 'CRITICAL' && <AlertOctagon size={40} className="mx-auto text-rose-500 mb-2" />}
+                                                {newType === 'WARNING' && <AlertTriangle size={40} className="mx-auto text-amber-500 mb-2 animate-bounce" />}
+                                                {newType === 'ATTENTION' && <Megaphone size={40} className="mx-auto text-orange-500 mb-2 animate-wiggle" />}
+                                                <h3 className="text-2xl font-black text-white uppercase tracking-wider">{newMsg}</h3>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="w-full h-12 bg-black rounded-full overflow-hidden flex items-center px-4 relative border border-white/10">
+                                            <div className={`
+                                                flex items-center px-4 py-1 rounded-full whitespace-nowrap
+                                                ${newType === 'ATTENTION' 
+                                                    ? 'bg-gradient-to-r from-orange-600 to-red-600 text-black border-2 border-yellow-400 animate-flash-alert' 
+                                                    : newType === 'CRITICAL' 
+                                                    ? 'bg-rose-950/80 border border-rose-500 animate-critical-attention' 
+                                                    : newType === 'WARNING'
+                                                    ? 'bg-amber-950/80 border border-amber-500 animate-warning-float'
+                                                    : 'bg-blue-950/80 border border-blue-500'
+                                                }
+                                            `}>
+                                                 {newType === 'ATTENTION' && <Megaphone className="mr-2 animate-wiggle" size={16} />}
+                                                 {newType === 'CRITICAL' && <AlertOctagon className="mr-2" size={16} />}
+                                                 {newType === 'WARNING' && <AlertTriangle className="mr-2" size={16} />}
+                                                 <span className={`font-mono font-bold ${newType === 'ATTENTION' ? 'text-black' : 'text-white'}`}>{newMsg}</span>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                             </div>
+                            )}
+                        </div>
+
+                        {/* Active Alerts List */}
+                        <div className="space-y-2">
+                            <label className="label-pro">Avisos Ativos</label>
+                            {announcements.map(alert => (
+                                <div key={alert.id} className="flex items-center justify-between p-4 bg-black/20 rounded-lg border border-white/5 group hover:bg-black/40 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`
+                                            w-10 h-10 rounded-full flex items-center justify-center shrink-0
+                                            ${alert.type === 'INFO' ? 'bg-blue-500/20 text-blue-500' :
+                                              alert.type === 'WARNING' ? 'bg-amber-500/20 text-amber-500' :
+                                              alert.type === 'ATTENTION' ? 'bg-orange-500/20 text-orange-500' :
+                                              'bg-rose-500/20 text-rose-500 animate-pulse'}
+                                        `}>
+                                            {alert.type === 'INFO' ? <Info size={20} /> :
+                                             alert.type === 'WARNING' ? <AlertTriangle size={20} /> :
+                                             alert.type === 'ATTENTION' ? <Megaphone size={20} /> :
+                                             <AlertOctagon size={20} />}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-white text-lg">{alert.message}</p>
+                                            <div className="flex gap-2 mt-1">
+                                                <Badge text={alert.type} />
+                                                <Badge text={alert.displayMode === 'OVERLAY' ? 'TELA CHEIA' : 'RODAPÉ'} color="blue" />
+                                                {alert.schedule && <Badge text="AGENDADO" color="blue" />}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => removeAnnouncement(alert.id)} className="p-3 text-brewery-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors">
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
+                            ))}
+                            {announcements.length === 0 && (
+                                <div className="text-center py-10 text-brewery-muted opacity-50 border-2 border-dashed border-brewery-border rounded-lg">
+                                    <Bell size={40} className="mx-auto mb-2" />
+                                    <p>Nenhum aviso ativo no momento.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -673,123 +1033,6 @@ const SettingsPanel: React.FC = () => {
                         </div>
                     </div>
                 )}
-
-                 {activeTab === 'MEDIA' && (
-                     <div className="space-y-6 max-w-3xl mx-auto">
-                         <SectionHeader title="Playlist / Menu Digital" desc="Gerencie as imagens que aparecem na tela (Cardápios, Fotos, Vídeos, GIFs)." />
-                         
-                         {/* Display Settings */}
-                         <div className="bg-brewery-card border border-brewery-border rounded-lg p-4 mb-6">
-                             <div className="flex items-center justify-between">
-                                 <div>
-                                     <h3 className="font-bold text-brewery-text text-sm mb-1">Ajuste de Tela (Global)</h3>
-                                     <p className="text-xs text-brewery-muted">Como o conteúdo deve se comportar</p>
-                                 </div>
-                                 <div className="flex bg-black/40 rounded-lg p-1 border border-brewery-border">
-                                     <button 
-                                        onClick={() => updateLayout({ mediaFit: 'COVER' })} 
-                                        className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition ${layout.mediaFit === 'COVER' ? 'bg-brewery-accent text-black shadow' : 'text-brewery-muted hover:text-white'}`}
-                                     >
-                                         <Crop size={14} /> Preencher (Cover)
-                                     </button>
-                                     <button 
-                                        onClick={() => updateLayout({ mediaFit: 'CONTAIN' })} 
-                                        className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition ${layout.mediaFit === 'CONTAIN' ? 'bg-brewery-accent text-black shadow' : 'text-brewery-muted hover:text-white'}`}
-                                     >
-                                         <Expand size={14} /> Ajustar (Contain)
-                                     </button>
-                                 </div>
-                             </div>
-                         </div>
-
-                         {/* Playlist Selector */}
-                         <div className="flex items-center gap-4 mb-4">
-                             <label className="text-sm font-bold text-brewery-muted uppercase">Editando Playlist:</label>
-                             <div className="flex bg-black/40 rounded-lg p-1 border border-brewery-border">
-                                 <button 
-                                    onClick={() => setSelectedPlaylist('floating')}
-                                    className={`px-4 py-2 text-xs font-bold rounded flex items-center gap-2 transition ${selectedPlaylist === 'floating' ? 'bg-indigo-600 text-white shadow' : 'text-brewery-muted hover:text-white'}`}
-                                 >
-                                    <Layers size={14} /> Janela Flutuante
-                                 </button>
-                                 <button 
-                                    onClick={() => setSelectedPlaylist('banner')}
-                                    className={`px-4 py-2 text-xs font-bold rounded flex items-center gap-2 transition ${selectedPlaylist === 'banner' ? 'bg-indigo-600 text-white shadow' : 'text-brewery-muted hover:text-white'}`}
-                                 >
-                                    <LayoutTemplate size={14} /> Banner Superior
-                                 </button>
-                             </div>
-                         </div>
-
-                         {/* Playlist Manager */}
-                         <div className="bg-black/20 rounded-lg border border-brewery-border overflow-hidden">
-                             <div className="p-3 border-b border-brewery-border bg-black/40 flex justify-between items-center">
-                                 <span className="text-xs font-bold uppercase text-brewery-muted flex items-center gap-2">
-                                    <List size={14} /> 
-                                    {selectedPlaylist === 'floating' ? 'Mídia: Janela Flutuante' : 'Mídia: Banner Superior'}
-                                 </span>
-                                 <span className="text-xs text-brewery-muted">{currentMediaList.length} itens</span>
-                             </div>
-                             
-                             <div className="divide-y divide-brewery-border">
-                                {currentMediaList.map((item, index) => (
-                                    <div key={item.id} className="p-3 flex items-center gap-3 hover:bg-white/5 transition-colors group">
-                                        <div className="w-6 text-center text-xs font-mono text-brewery-muted">{index + 1}</div>
-                                        
-                                        <div className="w-12 h-8 bg-black rounded overflow-hidden border border-white/10 shrink-0">
-                                            {item.type === 'VIDEO' ? (
-                                                <video src={item.url} className="w-full h-full object-cover opacity-50" />
-                                            ) : (
-                                                <img src={item.url} alt="" className="w-full h-full object-cover" />
-                                            )}
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-brewery-text truncate">{item.name}</p>
-                                            <p className="text-[10px] text-brewery-muted uppercase">{item.type} • {item.type === 'VIDEO' ? 'Auto' : `${item.duration}s`}</p>
-                                        </div>
-
-                                        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                            <button 
-                                                onClick={() => index > 0 && reorderMedia(selectedPlaylist, index, index - 1)}
-                                                disabled={index === 0}
-                                                className="p-1.5 hover:bg-black/40 rounded text-brewery-muted hover:text-white disabled:opacity-30"
-                                            >
-                                                <ArrowUp size={16} />
-                                            </button>
-                                            <button 
-                                                onClick={() => index < currentMediaList.length - 1 && reorderMedia(selectedPlaylist, index, index + 1)}
-                                                disabled={index === currentMediaList.length - 1}
-                                                className="p-1.5 hover:bg-black/40 rounded text-brewery-muted hover:text-white disabled:opacity-30"
-                                            >
-                                                <ArrowDown size={16} />
-                                            </button>
-                                            <div className="w-px h-4 bg-brewery-border mx-1" />
-                                            <button 
-                                                onClick={() => removeMedia(selectedPlaylist, item.id)}
-                                                className="p-1.5 hover:bg-rose-950/50 rounded text-brewery-muted hover:text-rose-500"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {currentMediaList.length === 0 && (
-                                    <div className="p-8 text-center text-brewery-muted border-dashed">
-                                        <Monitor size={24} className="mx-auto mb-2 opacity-50" />
-                                        <p className="text-sm">Playlist vazia.</p>
-                                        <p className="text-xs">Arraste arquivos para a tela principal para adicionar.</p>
-                                    </div>
-                                )}
-                             </div>
-                         </div>
-
-                         <div className="text-xs text-center text-brewery-muted mt-2">
-                             Dica: Arraste arquivos (JPG, PNG, GIF, MP4, HTML) diretamente para o painel correspondente na tela inicial para adicionar.
-                         </div>
-                     </div>
-                 )}
                 
                 {/* --- TAB: LAYOUT, HEADER, API (Remaining tabs logic reused) --- */}
                 {activeTab === 'HEADER' && (
@@ -972,6 +1215,37 @@ const SettingsPanel: React.FC = () => {
                                     <Toggle checked={layout.showMediaPanel} onChange={() => updateLayout({ showMediaPanel: !layout.showMediaPanel })} />
                                 </div>
                                 
+                                <div className="p-3 bg-black/20 rounded border border-white/5 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-indigo-400"><MousePointer2 size={18} /></div>
+                                            <div>
+                                                <span className="text-sm font-bold text-white block">Configuração da Janela de Mídia</span>
+                                                <span className="text-xs text-brewery-muted">Ajuste manual de posição e tamanho</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-4 gap-2 text-xs">
+                                        <div>
+                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Largura</label>
+                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.w} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, w: Number(e.target.value) } })} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Altura</label>
+                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.h} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, h: Number(e.target.value) } })} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Pos X</label>
+                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.x} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, x: Number(e.target.value) } })} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Pos Y</label>
+                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.y} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, y: Number(e.target.value) } })} />
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <div className="flex justify-between items-center p-3 bg-black/20 rounded border border-white/5">
                                     <div className="flex items-center gap-3">
                                         <Megaphone size={18} className="text-orange-400" />
@@ -991,24 +1265,6 @@ const SettingsPanel: React.FC = () => {
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="label-pro mb-4 flex justify-between">
-                                        <span>Velocidade do Ticker</span>
-                                        <span className="text-brewery-accent">{layout.tickerSpeed || 30}s</span>
-                                    </label>
-                                    <input 
-                                        type="range" 
-                                        min="10" max="100" 
-                                        value={layout.tickerSpeed || 30} 
-                                        onChange={(e) => updateLayout({ tickerSpeed: Number(e.target.value) })}
-                                        className="w-full h-2 bg-black rounded-lg appearance-none cursor-pointer accent-brewery-accent"
-                                    />
-                                    <div className="flex justify-between text-[10px] text-brewery-muted mt-1 font-mono">
-                                        <span>Rápido (10s)</span>
-                                        <span>Lento (100s)</span>
-                                    </div>
-                                </div>
-                                
-                                <div>
                                     <label className="label-pro mb-2">Ajuste de Mídia</label>
                                     <div className="flex bg-black rounded p-1 border border-brewery-border">
                                         <button 
@@ -1025,167 +1281,6 @@ const SettingsPanel: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
-                {/* --- TAB: API (Preserved) --- */}
-                {activeTab === 'API' && (
-                    <div className="space-y-8 max-w-4xl mx-auto">
-                        <SectionHeader title="Integração & Conectividade" desc="Configure a ponte MQTT/WebSocket para comunicação com os PLCs." />
-                        {/* Broker Config */}
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden shadow-lg">
-                            <div className="p-4 bg-black/40 border-b border-brewery-border flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-900/30 rounded text-blue-400"><Server size={20} /></div>
-                                    <div>
-                                        <h3 className="font-bold text-brewery-text">Configuração do Broker</h3>
-                                        <p className="text-xs text-brewery-muted">Parâmetros de conexão WebSocket/MQTT</p>
-                                    </div>
-                                </div>
-                                <button 
-                                     onClick={handleTestConnection}
-                                     disabled={testStatus === 'TESTING'}
-                                     className={`px-4 py-2 rounded text-xs font-bold flex items-center gap-2 transition-all border
-                                        ${testStatus === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/50' : 
-                                          testStatus === 'ERROR' ? 'bg-rose-500/10 text-rose-400 border-rose-500/50' : 
-                                          'bg-white/5 hover:bg-white/10 text-brewery-muted border-white/10'}
-                                     `}
-                                   >
-                                       {testStatus === 'TESTING' ? <RefreshCw size={14} className="animate-spin" /> : 
-                                        testStatus === 'SUCCESS' ? <CheckCircle size={14} /> : 
-                                        testStatus === 'ERROR' ? <AlertTriangle size={14} /> : <Zap size={14} />}
-                                       
-                                       {testStatus === 'IDLE' && 'Testar Conexão'}
-                                       {testStatus === 'TESTING' && 'Conectando...'}
-                                       {testStatus === 'SUCCESS' && 'Conectado'}
-                                       {testStatus === 'ERROR' && 'Falha'}
-                                   </button>
-                            </div>
-                            <div className="p-6 grid grid-cols-12 gap-4">
-                                <div className="col-span-12 md:col-span-2">
-                                    <label className="label-pro">Protocolo</label>
-                                    <select 
-                                        className="input-pro"
-                                        value={connectionConfig.protocol}
-                                        onChange={(e) => updateConnectionConfig({ protocol: e.target.value as any })}
-                                    >
-                                        <option value="ws">WS</option>
-                                        <option value="wss">WSS (Secure)</option>
-                                        <option value="mqtt">MQTT</option>
-                                    </select>
-                                </div>
-                                <div className="col-span-12 md:col-span-6">
-                                    <label className="label-pro">Host / Endereço IP</label>
-                                    <input 
-                                        className="input-pro font-mono text-emerald-300" 
-                                        placeholder="localhost" 
-                                        value={connectionConfig.host}
-                                        onChange={(e) => updateConnectionConfig({ host: e.target.value })}
-                                    />
-                                </div>
-                                <div className="col-span-12 md:col-span-2">
-                                    <label className="label-pro">Porta</label>
-                                    <input 
-                                        className="input-pro font-mono" 
-                                        placeholder="1880" 
-                                        value={connectionConfig.port}
-                                        onChange={(e) => updateConnectionConfig({ port: e.target.value })}
-                                    />
-                                </div>
-                                <div className="col-span-12 md:col-span-2">
-                                    <label className="label-pro">Caminho</label>
-                                    <input 
-                                        className="input-pro font-mono text-xs" 
-                                        placeholder="/ws" 
-                                        value={connectionConfig.path}
-                                        onChange={(e) => updateConnectionConfig({ path: e.target.value })}
-                                    />
-                                </div>
-                                <div className="col-span-12 my-2 border-t border-white/5"></div>
-                                <div className="col-span-12 md:col-span-6">
-                                    <label className="label-pro">Usuário (Opcional)</label>
-                                    <input 
-                                        className="input-pro" 
-                                        value={connectionConfig.username || ''}
-                                        onChange={(e) => updateConnectionConfig({ username: e.target.value })}
-                                    />
-                                </div>
-                                <div className="col-span-12 md:col-span-6">
-                                    <label className="label-pro">Senha (Opcional)</label>
-                                    <input 
-                                        type="password"
-                                        className="input-pro" 
-                                        value={connectionConfig.password || ''}
-                                        onChange={(e) => updateConnectionConfig({ password: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. DATA MAPPING */}
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden shadow-lg">
-                             <div className="p-4 bg-black/40 border-b border-brewery-border">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-amber-900/30 rounded text-amber-400"><Activity size={20} /></div>
-                                    <div>
-                                        <h3 className="font-bold text-brewery-text">Mapeamento de Tags</h3>
-                                        <p className="text-xs text-brewery-muted">Associe os tópicos MQTT aos equipamentos</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="divide-y divide-brewery-border">
-                                {lineConfigs.map(line => (
-                                    <div key={line.id} className="p-4 hover:bg-white/5 transition-colors group">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded bg-brewery-border flex items-center justify-center text-brewery-muted text-xs font-bold">{line.id}</div>
-                                                <div className="font-bold text-brewery-text">{line.name}</div>
-                                            </div>
-                                            <div className="text-xs font-mono text-brewery-muted bg-black px-2 py-1 rounded border border-brewery-border">
-                                                {line.nodeRedTopic || 'Sem tópico'}
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="label-pro text-[10px] text-amber-500/80">Tópico MQTT Principal</label>
-                                                <div className="flex items-center">
-                                                    <span className="bg-black border-y border-l border-brewery-border text-brewery-muted px-3 py-2.5 rounded-l text-xs font-mono select-none">/</span>
-                                                    <input 
-                                                        className="input-pro rounded-l-none font-mono text-xs text-white border-l-0 focus:ring-0" 
-                                                        value={line.nodeRedTopic}
-                                                        onChange={(e) => updateLine(line.id, { nodeRedTopic: e.target.value })}
-                                                        placeholder={`brewery/${line.id.toLowerCase()}`}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="bg-black/30 rounded border border-white/5 p-2 grid grid-cols-3 gap-2">
-                                                <div>
-                                                     <label className="text-[9px] uppercase text-brewery-muted font-bold">Prod</label>
-                                                     <input className="w-full bg-transparent border-b border-white/10 text-[10px] font-mono py-1 focus:border-amber-500 focus:outline-none text-white"
-                                                        value={line.dataMapping?.productionKey}
-                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, productionKey: e.target.value } })}
-                                                     />
-                                                </div>
-                                                <div>
-                                                     <label className="text-[9px] uppercase text-brewery-muted font-bold">Vel</label>
-                                                     <input className="w-full bg-transparent border-b border-white/10 text-[10px] font-mono py-1 focus:border-amber-500 focus:outline-none text-white"
-                                                        value={line.dataMapping?.speedKey}
-                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, speedKey: e.target.value } })}
-                                                     />
-                                                </div>
-                                                <div>
-                                                     <label className="text-[9px] uppercase text-brewery-muted font-bold">Temp</label>
-                                                     <input className="w-full bg-transparent border-b border-white/10 text-[10px] font-mono py-1 focus:border-amber-500 focus:outline-none text-white"
-                                                        value={line.dataMapping?.temperatureKey}
-                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, temperatureKey: e.target.value } })}
-                                                     />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
                         </div>
                     </div>
@@ -1244,64 +1339,39 @@ const SettingsPanel: React.FC = () => {
             color: #fffbeb;
             background-color: #291d18;
         }
+        /* Custom Animations for Alert Preview */
+        .animate-critical-attention {
+          animation: critical-attention 2s infinite ease-in-out;
+        }
+        .animate-warning-float {
+          animation: warning-float 3s infinite ease-in-out;
+        }
+        .animate-flash-alert {
+          animation: flash-alert 1s infinite linear;
+        }
+        .animate-wiggle {
+          animation: wiggle 0.5s infinite ease-in-out;
+        }
+        @keyframes critical-attention {
+          0%, 100% { transform: scale(1); background-color: rgba(76, 5, 25, 0.6); border-color: rgba(244, 63, 94, 0.5); }
+          50% { transform: scale(1.05); background-color: rgba(136, 19, 55, 0.6); border-color: #fff; }
+        }
+        @keyframes warning-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-3px); }
+        }
+        @keyframes flash-alert {
+          0%, 100% { opacity: 1; border-color: #fbbf24; }
+          50% { opacity: 0.9; border-color: #fff; }
+        }
+        @keyframes wiggle {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-10deg); }
+          75% { transform: rotate(10deg); }
+        }
       `}</style>
     </div>
   );
-};
-
-// UI Components
-const EffectCard = ({ active, onClick, icon, label, description, highlight }: any) => (
-    <div 
-        onClick={onClick}
-        className={`cursor-pointer rounded-lg border p-4 flex flex-col items-center justify-center gap-2 transition-all group ${active 
-            ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/40 scale-105' 
-            : highlight 
-                ? 'bg-purple-900/30 border-purple-500/50 text-purple-300 hover:bg-purple-900/40' 
-                : 'bg-black/40 border-purple-500/20 text-purple-300 hover:bg-purple-900/20'}`}
-    >
-        <div className={`p-2 rounded-full transition-colors ${active ? 'bg-white/20' : 'bg-black/20 group-hover:bg-purple-600/20'}`}>{icon}</div>
-        <div className="text-center">
-            <span className="text-xs font-bold block">{label}</span>
-            <span className={`text-[9px] ${active ? 'text-purple-100' : 'text-purple-400/60'}`}>{description}</span>
-        </div>
-    </div>
-);
-
-const NavButton = ({ active, onClick, icon, label }: any) => (
-    <button 
-        onClick={onClick} 
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${active ? 'bg-brewery-accent text-black shadow-lg shadow-amber-900/20' : 'text-brewery-muted hover:bg-black/20 hover:text-white'}`}
-    >
-        {icon}
-        {label}
-    </button>
-);
-
-const SectionHeader = ({ title, desc }: any) => (
-    <div className="mb-6 border-b border-brewery-border pb-4">
-        <h2 className="text-2xl font-bold text-brewery-text mb-1">{title}</h2>
-        <p className="text-brewery-muted text-sm">{desc}</p>
-    </div>
-);
-
-const Badge = ({ text, color = 'amber' }: any) => {
-    const borderColor = color === 'blue' ? 'border-blue-500/50' : 'border-brewery-border';
-    const textColor = color === 'blue' ? 'text-blue-400' : 'text-brewery-muted';
-    return (
-        <span className={`text-[10px] font-bold bg-black ${textColor} px-1.5 py-0.5 rounded border ${borderColor}`}>{text}</span>
-    );
-};
-
-const Toggle = ({ checked, onChange, color = 'amber' }: any) => {
-    const bgClass = color === 'purple' 
-        ? (checked ? 'bg-purple-600' : 'bg-zinc-700') 
-        : (checked ? 'bg-brewery-accent' : 'bg-zinc-700');
-
-    return (
-        <button onClick={onChange} className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ${bgClass}`}>
-            <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
-        </button>
-    );
 };
 
 export default SettingsPanel;
