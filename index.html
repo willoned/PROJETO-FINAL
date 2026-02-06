@@ -30,6 +30,8 @@
               'disco': 'disco 2s infinite',
               'rise': 'rise 4s infinite ease-in',
               'fall': 'fall 4s infinite linear',
+              'float': 'float 6s infinite ease-in-out',
+              'spin-slow': 'spin 3s linear infinite',
             },
             keyframes: {
               'party-glow': {
@@ -53,6 +55,11 @@
               'fall': {
                  '0%': { top: '-10%', transform: 'rotate(0deg)' },
                  '100%': { top: '110%', transform: 'rotate(360deg)' }
+              },
+              'float': {
+                '0%': { bottom: '-100px', transform: 'translateX(0)' },
+                '50%': { transform: 'translateX(20px)' },
+                '100%': { bottom: '110vh', transform: 'translateX(-20px)' }
               }
             }
           }

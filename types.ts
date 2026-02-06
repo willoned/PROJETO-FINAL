@@ -4,25 +4,35 @@ export interface DisplayConfig {
   showPB: boolean;      // PB (Efficiency/OEE or Gross Production)
   showHourly: boolean;  // Current Hourly Rate
   showTemp: boolean;    // Temperature
-  showTrend: boolean;   // The bottom chart
+  showTrend: boolean;   // The bottom chart (Area)
+  showBarChart: boolean; // NEW: The bottom chart (Bar)
 }
 
 // Data Mapping for Node-RED bridge
+// Configures which key in the incoming JSON corresponds to which internal field
 export interface DataMapping {
-  volumeKey: string;
-  pbKey: string;
-  hourlyKey: string;
-  tempKey: string;
+  productionKey: string;   // Maps to productionCount
+  speedKey: string;        // Maps to currentHourlyRate
+  temperatureKey: string;  // Maps to temperature
+  rejectKey: string;       // Maps to rejectCount
+  statusKey: string;       // Maps to status ('RUNNING' | 'STOPPED' | etc)
+  efficiencyKey: string;   // Maps to efficiency
 }
 
 // Defines the configuration for a production line (static data)
 export interface LineConfig {
   id: string;
   name: string;
+  image?: string; // NEW: Machine Image URL (Base64 or Link)
+  
+  // Measurement Configuration
+  productionUnit?: string; // NEW: L, ML, HL, KG, UN
+  timeBasis?: 'SECOND' | 'MINUTE' | 'HOUR' | 'DAY' | 'WEEK' | 'MONTH'; // NEW: Time basis for rate
+  
   // Data configuration
   targetPerHour: number;
-  nodeRedTopic: string;
-  dataMapping?: DataMapping; 
+  nodeRedTopic: string; // The topic/id to match in the WebSocket payload
+  dataMapping: DataMapping; 
   // Visual configuration (Absolute Positioning)
   x: number;
   y: number;
@@ -40,7 +50,7 @@ export interface TrendPoint {
   value: number;
 }
 
-// Defines the dynamic data payload (from Node-RED)
+// Defines the dynamic data payload (Standardized for UI)
 export interface MachineData {
   lineId: string;
   status: MachineStatus;
@@ -54,7 +64,7 @@ export interface MachineData {
 }
 
 // Media Types for the left panel
-export type MediaType = 'IMAGE' | 'VIDEO';
+export type MediaType = 'IMAGE' | 'VIDEO' | 'HTML';
 
 export interface MediaItem {
   id: string;
@@ -65,34 +75,78 @@ export interface MediaItem {
 }
 
 // Announcement Types
-export type AnnouncementType = 'INFO' | 'WARNING' | 'CRITICAL';
+export type AnnouncementType = 'INFO' | 'WARNING' | 'CRITICAL' | 'ATTENTION';
 
 export interface Announcement {
   id: string;
   message: string;
   type: AnnouncementType;
+  displayMode?: 'TICKER' | 'OVERLAY'; // NEW: Control if it's a footer ticker or a big central popup
   isActive: boolean;
+  schedule?: {
+    start?: string; // ISO String
+    end?: string;   // ISO String
+  };
 }
 
 // Layout Configuration Types
 export type WidgetSize = 'COMPACT' | 'NORMAL' | 'LARGE'; // Legacy type kept for compatibility if needed, but UI uses W/H
-export type SplitDirection = 'HORIZONTAL' | 'VERTICAL'; 
-export type PanelOrder = 'MEDIA_FIRST' | 'DASHBOARD_FIRST';
 export type MediaFitMode = 'CONTAIN' | 'COVER';
-export type PartyEffect = 'GLOW' | 'CONFETTI' | 'BUBBLES' | 'DISCO';
+// UPDATED: Added new party effects
+export type PartyEffect = 
+  | 'GLOW' 
+  | 'CONFETTI' 
+  | 'BUBBLES' 
+  | 'DISCO' 
+  | 'WORLDCUP' 
+  | 'OLYMPICS' 
+  | 'BIRTHDAY' 
+  | 'BONUS' 
+  | 'GOAL'
+  | 'CUSTOM'; // NEW: Custom image mode
+
+// New interface for the floating window
+export interface WindowPosition {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// NEW: Header Customization Settings
+export interface HeaderSettings {
+  title: string;
+  subtitle: string;
+  textColor: string;
+  backgroundColor: string;
+  showTopMedia: boolean;
+  topMediaHeight: number; // Height in pixels
+  alignment: 'LEFT' | 'CENTER'; // NEW: Title alignment
+}
+
+// NEW: Floating Logo Widget Settings
+export interface LogoWidgetSettings {
+  show: boolean;
+  url?: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 export interface LayoutSettings {
-  mediaPanelSize: number; 
-  splitDirection: SplitDirection;
-  panelOrder: PanelOrder;
+  header: HeaderSettings; // NEW: Header config
+  logoWidget: LogoWidgetSettings; // NEW: Floating Logo
+  mediaWindow: WindowPosition; // Floating window coordinates
   widgetSize: WidgetSize; // Global default
-  showMediaPanel: boolean;
+  showMediaPanel: boolean; // Controls the floating window
   showTicker: boolean;
   mediaFit: MediaFitMode; 
   tickerSpeed: number;
   isPartyMode: boolean; // NEW: Party Mode Toggle
   partyMessage?: string; // NEW: Custom party message
   partyEffect: PartyEffect; // NEW: Specific visual effect
+  customPartyImage?: string; // NEW: Base64 for custom party particle
 }
 
 // Connection Settings (MQTT/WebSocket)
@@ -111,19 +165,23 @@ export interface AppState {
   lineConfigs: LineConfig[]; 
   machines: Record<string, MachineData>;
   connectionStatus: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'ERROR';
+  globalError: string | null; // NEW: Global error message for UI display
   lastHeartbeat: number;
-  mediaPlaylist: MediaItem[];
+  // UPDATED: Support multiple playlists
+  playlists: Record<string, MediaItem[]>; 
   announcements: Announcement[];
   showSettings: boolean;
   layout: LayoutSettings;
-  connectionConfig: ConnectionSettings; // NEW: Global Connection Config
+  connectionConfig: ConnectionSettings; 
 }
 
 export interface AppContextType extends AppState {
   isStale: boolean;
-  addMedia: (item: MediaItem) => void;
-  removeMedia: (id: string) => void;
-  reorderMedia: (startIndex: number, endIndex: number) => void; // NEW
+  // UPDATED Actions to accept playlistKey
+  addMedia: (playlistKey: string, item: MediaItem) => void;
+  removeMedia: (playlistKey: string, id: string) => void;
+  reorderMedia: (playlistKey: string, startIndex: number, endIndex: number) => void;
+  
   addAnnouncement: (item: Announcement) => void;
   removeAnnouncement: (id: string) => void;
   toggleSettings: () => void;
@@ -135,4 +193,5 @@ export interface AppContextType extends AppState {
   removeLine: (id: string) => void;
   reorderLines: (startIndex: number, endIndex: number) => void;
   updateLineConfig: (id: string, target: number) => void; // Legacy support
+  clearError: () => void; // NEW
 }

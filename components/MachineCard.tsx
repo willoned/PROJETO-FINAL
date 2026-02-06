@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Box, Thermometer, Zap, AlertTriangle, GripVertical, Scaling, Clock, Move } from 'lucide-react';
+import { Box, Thermometer, Zap, AlertTriangle, GripVertical, Scaling, Clock, Move, WifiOff, Image as ImageIcon } from 'lucide-react';
 import { MachineData, LineConfig } from '../types';
 import { STATUS_COLORS } from '../constants';
 import TrendChart from './TrendChart';
+import BarChart from './BarChart';
 import { useMachineContext } from '../context/MachineContext';
 
 interface Props {
@@ -13,13 +14,14 @@ interface Props {
 
 const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
   const { updateLine, layout } = useMachineContext();
-  const display = config.display || { showVolume: false, showPB: false, showHourly: false, showTemp: false, showTrend: false };
+  const display = config.display || { showVolume: false, showPB: false, showHourly: false, showTemp: false, showTrend: false, showBarChart: false };
 
   // Local resize state
   const [isResizing, setIsResizing] = useState(false);
   const startRef = useRef<{ x: number, y: number, w: number, h: number }>({ x: 0, y: 0, w: 0, h: 0 });
 
-  // Data defaults
+  // Data defaults - READING MAPPED DATA FROM CONTEXT (Normalization happens in Context)
+  // This ensures specific keys like 'speedKey' configured in settings are already transformed to 'currentHourlyRate' here.
   const status = data?.status || 'MAINTENANCE';
   const count = data?.productionCount || 0;
   const pbValue = data?.efficiency || 0;
@@ -89,6 +91,18 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
   // If extremely narrow, force 1 column. Otherwise adapt.
   const gridCols = width < 300 ? 'grid-cols-1' : (activeMetrics === 3 ? 'grid-cols-3' : 'grid-cols-2');
 
+  // Units
+  const unit = config.productionUnit || 'L';
+  const timeBasisMap: Record<string, string> = {
+      'SECOND': 'Seg',
+      'MINUTE': 'Min',
+      'HOUR': 'Hora',
+      'DAY': 'Dia',
+      'WEEK': 'Sem',
+      'MONTH': 'Mês'
+  };
+  const timeBasisLabel = timeBasisMap[config.timeBasis || 'HOUR'] || 'Hora';
+
   return (
     <div className={`
       rounded-xl shadow-xl flex flex-col overflow-hidden relative group transition-all duration-300
@@ -110,6 +124,13 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
                <Move size={16} />
             </div>
             
+            {/* Machine Image (Optional) */}
+            {config.image && (
+                <div className="w-10 h-10 rounded-full bg-black/40 border border-white/10 shrink-0 overflow-hidden">
+                    <img src={config.image} alt="" className="w-full h-full object-cover" />
+                </div>
+            )}
+            
             {/* Title Block */}
             <div className="min-w-0">
               <h2 className={`text-brewery-accent font-bold uppercase tracking-wider leading-none truncate ${idSize}`}>
@@ -124,7 +145,7 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
         {/* Status Badge */}
         <div className={`shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-widest uppercase shadow-sm ${statusClass}`}>
             {status === 'ALARM' && <AlertTriangle size={10} className="animate-bounce" />}
-            {status}
+            {!data ? <WifiOff size={10} /> : status}
         </div>
       </div>
 
@@ -135,7 +156,7 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
           {display.showVolume && (
             <div className={`bg-black/40 rounded border border-white/5 backdrop-blur-sm ${isCompact ? 'p-1.5' : 'p-2'}`}>
                 <div className={`flex items-center text-brewery-muted uppercase font-bold tracking-wider mb-0.5 ${metricLabelSize}`}>
-                   <Box size={iconSize} className="mr-1" /> Litros
+                   <Box size={iconSize} className="mr-1" /> Volume ({unit})
                 </div>
                 <div className={`font-mono text-brewery-text font-bold leading-none tracking-tight ${metricValueSize}`}>
                   {count.toLocaleString()}
@@ -157,7 +178,7 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
           {display.showHourly && (
              <div className={`bg-black/40 rounded border border-white/5 backdrop-blur-sm ${isCompact ? 'p-1.5' : 'p-2'}`}>
                 <div className={`flex items-center text-brewery-muted uppercase font-bold tracking-wider mb-0.5 ${metricLabelSize}`}>
-                   <Clock size={iconSize} className="mr-1" /> L/Hora
+                   <Clock size={iconSize} className="mr-1" /> {unit}/{timeBasisLabel}
                 </div>
                 <div className={`font-mono font-bold leading-none tracking-tight ${metricValueSize} text-blue-400`}>
                   {hourlyRate}
@@ -177,11 +198,20 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
           </div>
       )}
 
-      {/* 4. Trend Chart (Background) */}
-      {display.showTrend && config.h > 150 && (
-        <div className={`absolute bottom-0 left-0 right-0 z-0 pointer-events-none opacity-40 transition-opacity`}>
-          <TrendChart data={trend} color={chartColor} />
-        </div>
+      {/* 4. Graphs (Bar or Area) */}
+      {/* Logic: Bar Chart takes precedence if both enabled, otherwise Area. */}
+      {config.h > 150 && (
+        <>
+            {display.showBarChart ? (
+                <div className={`absolute bottom-0 left-0 right-0 z-0 pointer-events-none opacity-40 transition-opacity`}>
+                    <BarChart data={trend} color={chartColor} />
+                </div>
+            ) : display.showTrend ? (
+                <div className={`absolute bottom-0 left-0 right-0 z-0 pointer-events-none opacity-40 transition-opacity`}>
+                    <TrendChart data={trend} color={chartColor} />
+                </div>
+            ) : null}
+        </>
       )}
 
       {/* Resize Handle (Bottom Right) */}
