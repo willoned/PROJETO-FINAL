@@ -47,16 +47,29 @@ const Header = () => {
 
   const { title, subtitle, textColor, backgroundColor, alignment } = layout.header;
 
+  // Lógica de Posicionamento da Marca d'água
+  // Se Título CENTRALIZADO -> Marca d'água vai para a ESQUERDA
+  // Se Título na ESQUERDA -> Marca d'água vai para o CENTRO
+  const watermarkPositionClass = alignment === 'CENTER' 
+      ? "left-6 top-1/2 -translate-y-1/2 items-start text-left" 
+      : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center text-center";
+
   return (
     <header 
-        className={`flex justify-between items-center p-4 border-b sticky top-0 z-50 h-20 shrink-0 select-none transition-colors duration-500`}
+        className={`flex justify-between items-center p-4 border-b sticky top-0 z-50 h-20 shrink-0 select-none transition-colors duration-500 relative`}
         style={{
             backgroundColor: layout.isPartyMode ? '#3b0764' : backgroundColor,
             borderColor: '#452c20'
         }}
     >
+      {/* BRANDING WATERMARK - OVERLAY EVERYTHING */}
+      <div className={`absolute ${watermarkPositionClass} flex flex-col justify-center pointer-events-none select-none z-[60] opacity-40 transition-all duration-500 mix-blend-screen`}>
+          <span className="font-mono font-black text-lg text-white tracking-widest leading-none drop-shadow-lg">&lt;ITF-TEtech/&gt;</span>
+          <span className="text-[9px] text-white uppercase tracking-[0.2em] font-medium mt-0.5 leading-none drop-shadow-md">Produced by Willon Eduardo</span>
+      </div>
+
       {/* Left / Center Container Logic */}
-      <div className={`flex items-center gap-4 flex-1 ${alignment === 'CENTER' ? 'justify-center' : 'justify-start'}`}>
+      <div className={`flex items-center gap-4 flex-1 ${alignment === 'CENTER' ? 'justify-center' : 'justify-start'} z-10 relative`}>
         
         {/* TEXT AREA */}
         <div className={alignment === 'CENTER' ? 'text-center' : 'text-left'}>
@@ -75,7 +88,7 @@ const Header = () => {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 md:gap-6 absolute right-4">
+      <div className="flex items-center gap-4 md:gap-6 absolute right-4 z-10">
         <ConnectionBadge status={connectionStatus} isStale={isStale} />
         
         <div className="text-right hidden lg:block">
@@ -133,10 +146,16 @@ const TopMediaBanner = () => {
 
     if (!layout.header.showTopMedia) return null;
 
+    const borderWidth = layout.header.topMediaBorderWidth ?? 1;
+
     return (
         <div 
-            style={{ height: layout.header.topMediaHeight }} 
-            className="w-full relative shrink-0 border-b border-brewery-border bg-black group"
+            style={{ 
+                height: layout.header.topMediaHeight,
+                borderTopWidth: borderWidth,
+                borderBottomWidth: borderWidth
+            }} 
+            className="w-full relative shrink-0 border-brewery-border bg-black group"
         >
             <MediaPanel playlistKey="banner" />
             
@@ -151,8 +170,56 @@ const TopMediaBanner = () => {
     );
 };
 
+// Resizable Wrapper for the Ticker
+const ResizableTicker = ({ children }: { children: React.ReactNode }) => {
+    const { layout, updateLayout } = useMachineContext();
+    const [isResizing, setIsResizing] = useState(false);
+    const startY = useRef(0);
+    const startH = useRef(0);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setIsResizing(true);
+        startY.current = e.clientY;
+        startH.current = layout.tickerHeight || 60;
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    };
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!isResizing) return;
+        requestAnimationFrame(() => {
+            const deltaY = e.clientY - startY.current;
+            const newHeight = Math.max(40, Math.min(200, startH.current + deltaY));
+            updateLayout({ tickerHeight: newHeight });
+        });
+    }, [isResizing, updateLayout]);
+
+    const handleMouseUp = useCallback(() => {
+        setIsResizing(false);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+    }, [handleMouseMove]);
+
+    if (!layout.showTicker) return null;
+
+    return (
+        <div className="relative group shrink-0">
+             {children}
+             {/* Resize Handle for Ticker (Bottom) */}
+             <div 
+                className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize hover:bg-brewery-accent/50 z-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                onMouseDown={handleMouseDown}
+            />
+        </div>
+    );
+};
+
 const CanvasLayout = () => {
-  const { machines, announcements, layout, updateLayout, lineConfigs, updateLine, toggleSettings } = useMachineContext();
+  const { machines, announcements, layout, updateLayout, lineConfigs, updateLine, toggleSettings, updateWindow } = useMachineContext();
   
   // -- CANVAS DRAG STATE --
   const [dragState, setDragState] = useState<{
@@ -165,7 +232,8 @@ const CanvasLayout = () => {
   }>({ type: null, id: null, startX: 0, startY: 0, initialX: 0, initialY: 0 });
 
   // -- RESIZE STATE (Generic) --
-  const [isResizing, setIsResizing] = useState<{ type: 'MEDIA' | 'LOGO' | null }>({ type: null });
+  // Updated to include ID for multiple media windows
+  const [isResizing, setIsResizing] = useState<{ type: 'MEDIA' | 'LOGO' | null; id?: string }>({ type: null });
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
   // -- CARD MOVE LOGIC --
@@ -182,14 +250,30 @@ const CanvasLayout = () => {
   };
 
   // -- RESIZE START LOGIC --
-  const handleResizeStart = (e: React.MouseEvent, type: 'MEDIA' | 'LOGO') => {
+  const handleResizeStart = (e: React.MouseEvent, type: 'MEDIA' | 'LOGO', id?: string) => {
     e.stopPropagation();
-    setIsResizing({ type });
+    setIsResizing({ type, id });
+    
+    // Determine initial dimensions based on type and id
+    let initialW = 0;
+    let initialH = 0;
+
+    if (type === 'LOGO') {
+        initialW = layout.logoWidget.w;
+        initialH = layout.logoWidget.h;
+    } else if (type === 'MEDIA' && id) {
+        const win = layout.floatingWindows.find(w => w.id === id);
+        if (win) {
+            initialW = win.w;
+            initialH = win.h;
+        }
+    }
+
     resizeStart.current = {
         x: e.clientX,
         y: e.clientY,
-        w: type === 'MEDIA' ? layout.mediaWindow.w : layout.logoWidget.w,
-        h: type === 'MEDIA' ? layout.mediaWindow.h : layout.logoWidget.h
+        w: initialW,
+        h: initialH
     };
   };
 
@@ -209,8 +293,9 @@ const CanvasLayout = () => {
 
             if (dragState.type === 'CARD' && dragState.id) {
                 updateLine(dragState.id, { x: newX, y: newY });
-            } else if (dragState.type === 'MEDIA') {
-                updateLayout({ mediaWindow: { ...layout.mediaWindow, x: newX, y: newY } });
+            } else if (dragState.type === 'MEDIA' && dragState.id) {
+                // Update specific floating window
+                updateWindow(dragState.id, { x: newX, y: newY });
             } else if (dragState.type === 'LOGO') {
                 updateLayout({ logoWidget: { ...layout.logoWidget, x: newX, y: newY } });
             }
@@ -230,15 +315,15 @@ const CanvasLayout = () => {
             const newW = Math.max(minW, resizeStart.current.w + deltaX);
             const newH = Math.max(minH, resizeStart.current.h + deltaY);
 
-            if (isResizing.type === 'MEDIA') {
-                updateLayout({ mediaWindow: { ...layout.mediaWindow, w: newW, h: newH } });
+            if (isResizing.type === 'MEDIA' && isResizing.id) {
+                updateWindow(isResizing.id, { w: newW, h: newH });
             } else if (isResizing.type === 'LOGO') {
                 updateLayout({ logoWidget: { ...layout.logoWidget, w: newW, h: newH } });
             }
         });
     }
 
-  }, [dragState, updateLine, updateLayout, layout.mediaWindow, layout.logoWidget, isResizing]);
+  }, [dragState, updateLine, updateLayout, updateWindow, layout.logoWidget, isResizing]);
 
   const handleMouseUp = useCallback(() => {
     setDragState({ type: null, id: null, startX: 0, startY: 0, initialX: 0, initialY: 0 });
@@ -274,8 +359,10 @@ const CanvasLayout = () => {
       {/* 1. TOP MEDIA BANNER (Full Width, Resizable Height) */}
       <TopMediaBanner />
 
-      {/* 2. TICKER */}
-      {layout.showTicker && <AnnouncementsTicker announcements={announcements} />}
+      {/* 2. TICKER (Resizable) */}
+      <ResizableTicker>
+         <AnnouncementsTicker announcements={announcements} />
+      </ResizableTicker>
 
       {/* 3. MAIN DASHBOARD AREA */}
       <div className="flex-1 overflow-hidden p-4 relative bg-black/20">
@@ -324,47 +411,53 @@ const CanvasLayout = () => {
             </div>
         )}
 
-        {/* FLOATING MEDIA WINDOW */}
-        {layout.showMediaPanel && (
+        {/* FLOATING MEDIA WINDOWS (Multiple) */}
+        {layout.showMediaPanel && layout.floatingWindows.map(win => (
             <div 
+                key={win.id}
                 style={{
                     position: 'absolute',
-                    left: layout.mediaWindow.x,
-                    top: layout.mediaWindow.y,
-                    width: layout.mediaWindow.w,
-                    height: layout.mediaWindow.h,
-                    zIndex: 100 // Always on top
+                    left: win.x,
+                    top: win.y,
+                    width: win.w,
+                    height: win.h,
+                    zIndex: 100 + (dragState.id === win.id ? 10 : 0) // Bring to front when dragging
                 }}
                 className={`rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden border transition-shadow duration-200 group ${layout.isPartyMode ? 'border-purple-500 shadow-purple-500/20' : 'bg-brewery-card border-brewery-accent/50'}`}
             >
                 {/* Drag Handle Bar */}
                 <div 
                     className="h-6 bg-black/60 flex items-center justify-center cursor-move opacity-0 group-hover:opacity-100 transition-opacity absolute top-0 left-0 right-0 z-50 backdrop-blur-sm"
-                    onMouseDown={(e) => handleDragStart(e, 'MEDIA', null, layout.mediaWindow.x, layout.mediaWindow.y)}
+                    onMouseDown={(e) => handleDragStart(e, 'MEDIA', win.id, win.x, win.y)}
                 >
                     <div className="w-10 h-1 rounded-full bg-white/20" />
                 </div>
 
-                <MediaPanel playlistKey="floating" />
+                <MediaPanel playlistKey={win.id} />
+
+                {/* Name Badge (Optional, mostly for Settings mode) */}
+                <div className="absolute top-1 left-2 pointer-events-none z-40 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] text-white/50 bg-black/50 px-1 rounded">{win.name}</span>
+                </div>
 
                 {/* Resize Handle */}
                 <div 
                     className="absolute bottom-0 right-0 w-6 h-6 flex items-end justify-end p-0.5 cursor-nwse-resize text-white/50 hover:text-white z-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onMouseDown={(e) => handleResizeStart(e, 'MEDIA')}
+                    onMouseDown={(e) => handleResizeStart(e, 'MEDIA', win.id)}
                 >
                     <Scaling size={14} className="transform rotate-90" />
                 </div>
             </div>
-        )}
+        ))}
 
-        {/* DASHBOARD CANVAS */}
+        {/* DASHBOARD CANVAS - INCREASED SIZE FOR 50" SCREENS */}
         <div className="absolute inset-0 overflow-auto custom-scrollbar">
             {/* Background Grid Pattern */}
-            <div className="absolute inset-0 z-0 opacity-10 pointer-events-none w-[3000px] h-[2000px]" 
+            <div className="absolute inset-0 z-0 opacity-10 pointer-events-none w-[5000px] h-[3000px]" 
                 style={{ backgroundImage: 'radial-gradient(#f59e0b 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
             </div>
 
-            <div className="w-[3000px] h-[2000px] relative p-4"> 
+            <div className="w-[5000px] h-[3000px] relative p-4"> 
                 {lineConfigs.map((config) => (
                     <div 
                         key={config.id}
@@ -376,7 +469,7 @@ const CanvasLayout = () => {
                             height: config.h,
                             zIndex: dragState.id === config.id ? 50 : 10
                         }}
-                        className={`transition-all duration-200 ${dragState.id === config.id ? 'shadow-[0_0_20px_rgba(245,158,11,0.5)]' : ''}`}
+                        className={`transition-all duration-75 ${dragState.id === config.id ? 'scale-[1.01] shadow-[0_20px_40px_rgba(0,0,0,0.6)] z-[60]' : ''}`}
                     >
                         <MachineCard 
                             config={config} 

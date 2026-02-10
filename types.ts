@@ -106,8 +106,10 @@ export type PartyEffect =
   | 'GOAL'
   | 'CUSTOM'; // NEW: Custom image mode
 
-// New interface for the floating window
-export interface WindowPosition {
+// New interface for floating windows configuration
+export interface FloatingWindowConfig {
+  id: string; // Unique ID (used for playlist key)
+  name: string; // Display name
   x: number;
   y: number;
   w: number;
@@ -122,6 +124,7 @@ export interface HeaderSettings {
   backgroundColor: string;
   showTopMedia: boolean;
   topMediaHeight: number; // Height in pixels
+  topMediaBorderWidth: number; // NEW: Border thickness
   alignment: 'LEFT' | 'CENTER'; // NEW: Title alignment
 }
 
@@ -138,10 +141,12 @@ export interface LogoWidgetSettings {
 export interface LayoutSettings {
   header: HeaderSettings; // NEW: Header config
   logoWidget: LogoWidgetSettings; // NEW: Floating Logo
-  mediaWindow: WindowPosition; // Floating window coordinates
+  floatingWindows: FloatingWindowConfig[]; // UPDATED: Multiple windows support
   widgetSize: WidgetSize; // Global default
-  showMediaPanel: boolean; // Controls the floating window
+  showMediaPanel: boolean; // Controls if ANY floating window is shown (Global toggle)
   showTicker: boolean;
+  tickerHeight: number; // NEW: Adjustable ticker height
+  tickerFontSize: number; // NEW: Adjustable ticker font size
   mediaFit: MediaFitMode; 
   tickerSpeed: number;
   isPartyMode: boolean; // NEW: Party Mode Toggle
@@ -189,6 +194,12 @@ export interface AppContextType extends AppState {
   toggleSettings: () => void;
   updateLayout: (settings: Partial<LayoutSettings>) => void;
   updateConnectionConfig: (settings: Partial<ConnectionSettings>) => void;
+  
+  // Window Management
+  addWindow: (name: string) => void;
+  removeWindow: (id: string) => void;
+  updateWindow: (id: string, config: Partial<FloatingWindowConfig>) => void;
+
   // Line Management Actions
   addLine: (config: LineConfig) => void;
   updateLine: (id: string, config: Partial<LineConfig>) => void;

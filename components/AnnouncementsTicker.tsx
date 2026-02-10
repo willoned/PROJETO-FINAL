@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Info, AlertCircle, Megaphone } from 'lucide-react';
+import { AlertTriangle, Info, AlertCircle, Megaphone, Radio } from 'lucide-react';
 import { Announcement } from '../types';
 import { useMachineContext } from '../context/MachineContext';
 
@@ -32,62 +32,65 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
   });
 
   // Seamless Loop Logic: Repeat the list multiple times to ensure we can animate smoothly
-  // We repeat 10 times to ensure we cover the screen width and provide a buffer
   const seamlessList = useMemo(() => {
       if (activeAnnouncements.length === 0) return [];
+      // Create enough duplicates to fill the screen width comfortably
       return Array(10).fill(activeAnnouncements).flat();
   }, [activeAnnouncements]);
 
   if (activeAnnouncements.length === 0) return null;
 
-  // We animate from 0% to -10% (because we have 10 copies, moving 1 copy width makes it seamless)
-  // The duration is controlled by tickerSpeed. 
-  // We interpret tickerSpeed as "Time to play one full cycle of the original list".
   const duration = layout.tickerSpeed || 30;
+  const height = layout.tickerHeight || 60; // Get height from context
+  const fontSize = layout.tickerFontSize || 18; // Get font size from context
 
   return (
-    <div className="bg-brewery-card border-y border-brewery-border overflow-hidden relative h-12 flex items-center group">
+    <div 
+        className="bg-brewery-card border-y border-brewery-border overflow-hidden relative flex items-center group z-40 shadow-lg"
+        style={{ height: height }}
+    >
       {/* Label Badge */}
-      <div className="absolute left-0 top-0 bottom-0 bg-indigo-600 px-4 flex items-center z-20 shadow-[4px_0_15px_rgba(0,0,0,0.5)]">
+      <div className="absolute left-0 top-0 bottom-0 bg-indigo-600 px-6 flex items-center z-20 shadow-[4px_0_15px_rgba(0,0,0,0.5)]">
         <span className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
-            <AlertCircle size={14} className="animate-pulse" />
+            <Radio size={16} className="animate-pulse" />
             Avisos
         </span>
       </div>
       
-      {/* Gradient Mask for smooth entry under label */}
-      <div className="absolute left-20 top-0 bottom-0 w-16 bg-gradient-to-r from-brewery-card to-transparent z-10 pointer-events-none" />
+      {/* Gradient Mask */}
+      <div className="absolute left-24 top-0 bottom-0 w-24 bg-gradient-to-r from-brewery-card to-transparent z-10 pointer-events-none" />
 
-      {/* Animation wrapper - Seamless Loop */}
+      {/* Animation wrapper */}
       <div 
-        className="flex animate-marquee whitespace-nowrap hover:pause will-change-transform pl-32"
+        className="flex animate-marquee whitespace-nowrap hover:pause will-change-transform pl-40 items-center h-full"
         style={{ animationDuration: `${duration}s` }}
       >
         {seamlessList.map((announcement, index) => (
           <div 
             key={`${announcement.id}-${index}`} 
             className={`
-              flex items-center mx-6 px-4 py-1 rounded-full transition-all duration-300
+              flex items-center mx-8 px-6 py-1.5 rounded-lg border-l-4 shadow-lg transition-all duration-300
               ${announcement.type === 'ATTENTION' 
-                ? 'bg-gradient-to-r from-orange-600 to-red-600 text-black border-2 border-yellow-400 animate-flash-alert shadow-[0_0_20px_rgba(249,115,22,0.6)]' 
+                ? 'bg-orange-950/80 border-l-orange-500 border-y border-r border-white/10 text-orange-100 animate-flash-attention' 
                 : announcement.type === 'CRITICAL' 
-                ? 'bg-rose-950/60 border border-rose-900/50 animate-critical-attention shadow-[0_0_10px_rgba(244,63,94,0.2)]' 
+                ? 'bg-rose-950/90 border-l-rose-600 border-y border-r border-rose-500/30 text-white animate-pulse-critical' 
                 : announcement.type === 'WARNING'
-                ? 'bg-amber-950/40 border border-amber-900/30 animate-warning-float'
-                : 'bg-blue-950/30 border border-blue-900/20 hover:bg-blue-900/40'
+                ? 'bg-amber-950/60 border-l-amber-500 border-y border-r border-white/5 text-amber-100'
+                : 'bg-blue-950/40 border-l-blue-500 border-y border-r border-white/5 text-blue-100'
               }
             `}
           >
-            {announcement.type === 'ATTENTION' && <Megaphone className="text-black mr-2 shrink-0 animate-wiggle" size={24} strokeWidth={2.5} />}
-            {announcement.type === 'CRITICAL' && <AlertCircle className="text-rose-500 mr-2 shrink-0" size={20} />}
-            {announcement.type === 'WARNING' && <AlertTriangle className="text-amber-500 mr-2 shrink-0" size={20} />}
-            {announcement.type === 'INFO' && <Info className="text-blue-500 mr-2 shrink-0" size={20} />}
+            {announcement.type === 'ATTENTION' && <Megaphone className="text-orange-500 mr-3 shrink-0 animate-wiggle" size={fontSize * 1.2} strokeWidth={2.5} />}
+            {announcement.type === 'CRITICAL' && <AlertCircle className="text-rose-500 mr-3 shrink-0 animate-ping-slow" size={fontSize * 1.2} strokeWidth={3} />}
+            {announcement.type === 'WARNING' && <AlertTriangle className="text-amber-500 mr-3 shrink-0" size={fontSize * 1.2} />}
+            {announcement.type === 'INFO' && <Info className="text-blue-400 mr-3 shrink-0" size={fontSize * 1.2} />}
             
-            <span className={`font-mono text-lg font-bold tracking-tight ${
-              announcement.type === 'ATTENTION' ? 'text-black drop-shadow-sm uppercase' :
-              announcement.type === 'CRITICAL' ? 'text-rose-100 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]' : 
-              announcement.type === 'WARNING' ? 'text-amber-100' : 'text-blue-100'
-            }`}>
+            <span 
+                className={`font-mono font-bold tracking-tight uppercase ${
+                  announcement.type === 'CRITICAL' ? 'drop-shadow-[0_0_5px_rgba(244,63,94,0.8)]' : ''
+                }`}
+                style={{ fontSize: `${fontSize}px` }}
+            >
               {announcement.message}
             </span>
           </div>
@@ -97,30 +100,26 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
       <style>{`
         @keyframes marquee {
           0% { transform: translate3d(0, 0, 0); }
-          100% { transform: translate3d(-10%, 0, 0); } /* Move 1/10th of the total width (1 set) */
+          100% { transform: translate3d(-10%, 0, 0); }
         }
         
-        @keyframes critical-attention {
+        /* SOPHISTICATED CRITICAL ANIMATION: Aggressive Red Flash */
+        @keyframes pulse-critical {
           0%, 100% { 
-            transform: scale(1);
-            background-color: rgba(76, 5, 25, 0.6);
-            box-shadow: 0 0 10px rgba(244, 63, 94, 0.2);
+            box-shadow: 0 0 10px rgba(225, 29, 72, 0.2) inset;
+            border-color: rgba(225, 29, 72, 0.5);
           }
           50% { 
-            transform: scale(1.05);
-            background-color: rgba(136, 19, 55, 0.6);
-            box-shadow: 0 0 20px rgba(244, 63, 94, 0.6);
+            box-shadow: 0 0 30px rgba(225, 29, 72, 0.6) inset;
+            border-color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(136, 19, 55, 0.9);
           }
         }
 
-        @keyframes warning-float {
-          0%, 100% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(0, -3px, 0); }
-        }
-
-        @keyframes flash-alert {
-            0%, 100% { opacity: 1; transform: scale(1); border-color: #fbbf24; }
-            50% { opacity: 0.9; transform: scale(1.05); border-color: #fff; }
+        /* SOPHISTICATED ATTENTION ANIMATION: Orange/Yellow Pulse */
+        @keyframes flash-attention {
+          0%, 100% { border-color: rgba(249, 115, 22, 0.5); transform: scale(1); }
+          50% { border-color: #fbbf24; transform: scale(1.02); background-color: rgba(124, 45, 18, 0.8); }
         }
 
         @keyframes wiggle {
@@ -129,29 +128,30 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
             75% { transform: rotate(10deg); }
         }
 
+        @keyframes ping-slow {
+            75%, 100% { transform: scale(1.5); opacity: 0; }
+        }
+
         .animate-marquee {
           animation-name: marquee;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
         }
 
-        .animate-critical-attention {
-          animation: critical-attention 2s infinite ease-in-out;
-          will-change: transform, background-color, box-shadow;
+        .animate-pulse-critical {
+          animation: pulse-critical 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
-        .animate-warning-float {
-          animation: warning-float 3s infinite ease-in-out;
-          will-change: transform;
-        }
-
-        .animate-flash-alert {
-            animation: flash-alert 1s infinite linear;
-            will-change: transform, opacity;
+        .animate-flash-attention {
+          animation: flash-attention 2s ease-in-out infinite;
         }
 
         .animate-wiggle {
             animation: wiggle 0.5s infinite ease-in-out;
+        }
+        
+        .animate-ping-slow {
+            animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
         }
 
         .hover\\:pause:hover {

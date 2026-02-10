@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import process from 'node:process'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -26,7 +27,8 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1366,
     height: 768,
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    // Icon logic: In dev, it's in public/. In prod, public assets are moved to dist/.
+    icon: path.join(process.env.VITE_PUBLIC, 'icon.ico'), 
     autoHideMenuBar: true, // Hide default menu
     webPreferences: {
       nodeIntegration: true, // Required for internal communication
@@ -37,15 +39,23 @@ function createWindow() {
     },
   })
 
+  // --- HEALTH CHECK: CLEAR CACHE ---
+  // Clears HTTP cache, image cache, and script cache on every startup.
+  win.webContents.session.clearCache().then(() => {
+    console.log('Session cache cleared successfully to maintain disk health.');
+  });
+
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
   if (VITE_DEV_SERVER_URL) {
+    // Development: Load from Vite Dev Server
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
-    // win.loadFile('dist/index.html')
+    // Production: Load from local file system
+    // The 'base: "./"' config in vite.config.ts is crucial for this to work
     win.loadFile(path.join(process.env.DIST, 'index.html'))
   }
 }

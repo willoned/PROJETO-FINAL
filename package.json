@@ -38,13 +38,21 @@
     "vite-plugin-electron-renderer": "^0.14.5"
   },
   "build": {
-    "appId": "com.industrialviewport.app",
+    "appId": "com.industrial.viewport",
     "productName": "Industrial Viewport Pro",
     "copyright": "Copyright © 2024 Industrial Viewport",
+    "directories": {
+      "output": "dist_setup"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
     "mac": {
       "category": "public.app-category.productivity"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -57,7 +65,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Industrial Viewport Pro"
     }
   }
 }

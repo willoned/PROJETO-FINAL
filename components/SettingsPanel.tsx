@@ -8,7 +8,9 @@ import {
   PartyPopper, Calendar, Disc, Sparkles, Wind, Server, CheckCircle, AlertTriangle, RefreshCw,
   ArrowUp, ArrowDown, Crop, Expand, Clock, Type, List, RotateCcw, Gauge, Zap, AlertOctagon, Info, Megaphone,
   Trophy, Medal, Cake, Banknote, Target, Flag, AlignLeft, AlignCenter, Image as ImageIcon, Upload, Scissors,
-  BarChart3, TrendingUp, Scale, Timer, Layers, Maximize, Rss, Tv, MousePointer2, Terminal, Pause, Play, Eraser
+  BarChart3, TrendingUp, Scale, Timer, Layers, Maximize, Rss, Tv, MousePointer2, Terminal, Pause, Play, Eraser,
+  CopyPlus, Link2, Network, CalendarClock, ChevronRight, Bug, FileJson, Hash, Tags, Wifi, Cpu, Globe, ArrowRightLeft,
+  Move, Palette, CreditCard
 } from 'lucide-react';
 import { AnnouncementType, LineConfig } from '../types';
 import { LINE_CONFIGS as DEFAULT_LINES } from '../constants';
@@ -39,6 +41,9 @@ const SectionHeader: React.FC<{ title: string; desc: string }> = ({ title, desc 
 const Badge: React.FC<{ text: string; color?: string }> = ({ text, color }) => {
     let bgClass = 'bg-white/10 text-brewery-muted border-white/10';
     if (color === 'blue') bgClass = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    if (color === 'amber') bgClass = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    if (color === 'rose') bgClass = 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+    if (color === 'orange') bgClass = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
     
     return (
         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${bgClass}`}>
@@ -84,13 +89,27 @@ const SettingsPanel: React.FC = () => {
     announcements, addAnnouncement, removeAnnouncement,
     layout, updateLayout,
     lineConfigs, addLine, removeLine, updateLine,
-    connectionConfig, updateConnectionConfig
+    connectionConfig, updateConnectionConfig,
+    addWindow, removeWindow, updateWindow,
+    connectionStatus
   } = useMachineContext();
   
   const [activeTab, setActiveTab] = useState<'LINES' | 'API' | 'LAYOUT' | 'MEDIA' | 'ALERTS' | 'PARTY' | 'HEADER'>('LINES');
   
+  // API Sub-tabs state
+  const [apiSubTab, setApiSubTab] = useState<'CONNECTION' | 'TAGS'>('CONNECTION');
+
   // Playlist Management State
-  const [selectedPlaylist, setSelectedPlaylist] = useState('floating'); // 'floating' or 'banner'
+  const [selectedPlaylist, setSelectedPlaylist] = useState<string>('banner'); 
+  const [newWindowName, setNewWindowName] = useState('');
+
+  // Update selected playlist when windows change if the selection is invalid
+  useEffect(() => {
+     const windowIds = layout.floatingWindows.map(w => w.id);
+     if (selectedPlaylist !== 'banner' && !windowIds.includes(selectedPlaylist) && windowIds.length > 0) {
+         setSelectedPlaylist(windowIds[0]);
+     }
+  }, [layout.floatingWindows, selectedPlaylist]);
 
   // Local state for Alerts
   const [newMsg, setNewMsg] = useState('');
@@ -106,6 +125,8 @@ const SettingsPanel: React.FC = () => {
 
   // Test Connection State
   const [testStatus, setTestStatus] = useState<'IDLE' | 'TESTING' | 'SUCCESS' | 'ERROR'>('IDLE');
+  // Simulated Ping for visual effect
+  const [ping, setPing] = useState(0);
 
   // Background Removal State
   const [isProcessingBg, setIsProcessingBg] = useState(false);
@@ -114,6 +135,18 @@ const SettingsPanel: React.FC = () => {
   const [consoleLogs, setConsoleLogs] = useState<{time: string, data: any}[]>([]);
   const [isLogPaused, setIsLogPaused] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Simulate ping updates when connected
+  useEffect(() => {
+      if (connectionStatus === 'CONNECTED') {
+          const interval = setInterval(() => {
+              setPing(Math.floor(Math.random() * 40) + 10);
+          }, 2000);
+          return () => clearInterval(interval);
+      } else {
+          setPing(0);
+      }
+  }, [connectionStatus]);
 
   // Effect to scroll to bottom of logs
   useEffect(() => {
@@ -133,7 +166,7 @@ const SettingsPanel: React.FC = () => {
                         data 
                     };
                     // Keep last 30 logs to avoid memory issues
-                    return [...prev.slice(-29), newLog];
+                    return [...prev.slice(-49), newLog];
                 });
             }
         });
@@ -161,6 +194,16 @@ const SettingsPanel: React.FC = () => {
       ...editForm,
       display: { ...editForm.display, [field]: !editForm.display[field] }
     });
+  };
+
+  const handleMappingChange = (key: string, value: string) => {
+      setEditForm(prev => ({
+          ...prev,
+          dataMapping: {
+              ...prev.dataMapping!,
+              [key]: value
+          }
+      }));
   };
 
   const toggleChartType = (type: 'TREND' | 'BAR') => {
@@ -193,27 +236,6 @@ const SettingsPanel: React.FC = () => {
     }, 1500);
   };
 
-  const resetLayoutPositions = () => {
-    if(confirm('Isso irá resetar a posição de todos os cards, logo e da janela de mídia. Continuar?')) {
-        // 1. Reset Global UI Elements
-        updateLayout({ 
-            mediaWindow: { x: 800, y: 350, w: 400, h: 300 },
-            logoWidget: { ...layout.logoWidget, x: 20, y: 20, w: 120, h: 120 }
-        });
-
-        // 2. Reset All Machines to Default Constants
-        lineConfigs.forEach(line => {
-            const def = DEFAULT_LINES.find(d => d.id === line.id);
-            if (def) {
-                updateLine(line.id, { x: def.x, y: def.y, w: def.w, h: def.h });
-            } else {
-                // Cascading fallback for new lines created by user
-                updateLine(line.id, { x: 50, y: 50 });
-            }
-        });
-    }
-  };
-
   // Reusable Image Processor (Logo, Party Mode, Line Image)
   const processImage = (file: File, removeBg: boolean, type: 'LOGO' | 'PARTY' | 'LINE') => {
       setIsProcessingBg(true);
@@ -226,13 +248,10 @@ const SettingsPanel: React.FC = () => {
               let processedBase64 = e.target?.result as string;
 
               if (removeBg) {
-                  // Canvas magic for simple background removal (White/Light pixels)
                   const canvas = document.createElement('canvas');
                   const ctx = canvas.getContext('2d');
                   if (!ctx) return;
                   
-                  // Scale down if too huge to save performance
-                  // For logos we want better quality, but for particles smaller is better.
                   const maxWidth = type === 'PARTY' ? 300 : 800;
                   const scale = Math.min(1, maxWidth / img.width);
                   canvas.width = img.width * scale;
@@ -243,13 +262,11 @@ const SettingsPanel: React.FC = () => {
                   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                   const data = imageData.data;
                   
-                  // Simple algorithm: If pixel is light, make transparent
                   for (let i = 0; i < data.length; i += 4) {
                       const r = data[i];
                       const g = data[i + 1];
                       const b = data[i + 2];
                       
-                      // Threshold for "White-ish"
                       if (r > 200 && g > 200 && b > 200) {
                           data[i + 3] = 0; // Set Alpha to 0
                       }
@@ -318,6 +335,7 @@ const SettingsPanel: React.FC = () => {
                 {/* --- TAB: LINES & TANKS --- */}
                  {activeTab === 'LINES' && (
                     <div className="space-y-6 max-w-3xl mx-auto">
+                        {/* ... (Existing Lines Code) ... */}
                          <SectionHeader title="Gestão de Equipamentos" desc="Configure tanques, linhas de envase e esteiras." />
                          
                          {/* ADD NEW LINE WIDGET */}
@@ -424,11 +442,65 @@ const SettingsPanel: React.FC = () => {
                                                      </div>
                                                 </div>
                                             </div>
+
+                                            {/* --- DATA MAPPING SECTION (TAGS) --- */}
+                                            <div className="p-5 bg-black/30 rounded-lg border border-white/5">
+                                                <div className="col-span-full text-xs font-bold text-brewery-accent uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                    <Link2 size={14} /> Mapeamento de Dados (Tags MQTT)
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="label-pro flex items-center gap-2"><Database size={10}/> Volume (Tag)</label>
+                                                        <input 
+                                                            className="input-pro font-mono text-xs" 
+                                                            placeholder="Ex: payload.volume"
+                                                            value={editForm.dataMapping?.productionKey}
+                                                            onChange={(e) => handleMappingChange('productionKey', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="label-pro flex items-center gap-2"><Gauge size={10}/> Velocidade (Tag)</label>
+                                                        <input 
+                                                            className="input-pro font-mono text-xs" 
+                                                            placeholder="Ex: payload.speed"
+                                                            value={editForm.dataMapping?.speedKey}
+                                                            onChange={(e) => handleMappingChange('speedKey', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="label-pro flex items-center gap-2"><Activity size={10}/> Temperatura (Tag)</label>
+                                                        <input 
+                                                            className="input-pro font-mono text-xs" 
+                                                            placeholder="Ex: payload.temp"
+                                                            value={editForm.dataMapping?.temperatureKey}
+                                                            onChange={(e) => handleMappingChange('temperatureKey', e.target.value)}
+                                                        />
+                                                    </div>
+                                                     <div>
+                                                        <label className="label-pro flex items-center gap-2"><Zap size={10}/> Eficiência (Tag)</label>
+                                                        <input 
+                                                            className="input-pro font-mono text-xs" 
+                                                            placeholder="Ex: payload.oee"
+                                                            value={editForm.dataMapping?.efficiencyKey}
+                                                            onChange={(e) => handleMappingChange('efficiencyKey', e.target.value)}
+                                                        />
+                                                    </div>
+                                                     <div className="col-span-full">
+                                                        <label className="label-pro flex items-center gap-2"><Info size={10}/> Status (Tag)</label>
+                                                        <input 
+                                                            className="input-pro font-mono text-xs" 
+                                                            placeholder="Ex: payload.status"
+                                                            value={editForm.dataMapping?.statusKey}
+                                                            onChange={(e) => handleMappingChange('statusKey', e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                             
                                             {/* METRICS GRID OPTIMIZED */}
                                             <div className="p-5 bg-black/30 rounded-lg border border-white/5">
                                                 <div className="col-span-full text-xs font-bold text-brewery-accent uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                    <Eye size={14} /> Dados Visíveis no Card
+                                                    <Eye size={14} /> Dados Visíveis no Card (On/Off)
                                                 </div>
                                                 
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -442,7 +514,7 @@ const SettingsPanel: React.FC = () => {
                                                     </div>
                                                     <div className={`p-3 rounded border transition-colors cursor-pointer flex flex-col items-center justify-center gap-2 text-center ${editForm.display?.showHourly ? 'bg-brewery-accent/20 border-brewery-accent text-white' : 'border-white/10 text-brewery-muted hover:bg-white/5'}`} onClick={() => toggleDisplayField('showHourly')}>
                                                         <Clock size={18} />
-                                                        <span className="text-[10px] font-bold uppercase">Vazão ({editForm.productionUnit || 'L'}/{editForm.timeBasis === 'MINUTE' ? 'Min' : editForm.timeBasis === 'DAY' ? 'Dia' : 'Hora'})</span>
+                                                        <span className="text-[10px] font-bold uppercase">Vazão</span>
                                                     </div>
                                                     <div className={`p-3 rounded border transition-colors cursor-pointer flex flex-col items-center justify-center gap-2 text-center ${editForm.display?.showTemp ? 'bg-brewery-accent/20 border-brewery-accent text-white' : 'border-white/10 text-brewery-muted hover:bg-white/5'}`} onClick={() => toggleDisplayField('showTemp')}>
                                                         <Activity size={18} />
@@ -515,134 +587,761 @@ const SettingsPanel: React.FC = () => {
                     </div>
                  )}
 
-                {/* --- TAB: API CONNECTION --- */}
-                {activeTab === 'API' && (
-                    <div className="space-y-6 max-w-3xl mx-auto">
-                        <SectionHeader title="Conexão Industrial" desc="Configuração do protocolo WebSocket/MQTT para o chão de fábrica." />
-
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 space-y-6">
-                            
-                            {/* Protocol & Host */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <div className="col-span-1">
-                                    <label className="label-pro">Protocolo</label>
-                                    <select 
-                                        className="input-pro"
-                                        value={connectionConfig.protocol}
-                                        onChange={(e) => updateConnectionConfig({ protocol: e.target.value as 'ws' | 'wss' })}
-                                    >
-                                        <option value="ws">WS://</option>
-                                        <option value="wss">WSS:// (Secure)</option>
-                                    </select>
+                {/* --- TAB: HEADER & BRAND --- */}
+                {activeTab === 'HEADER' && (
+                    <div className="space-y-6 max-w-4xl mx-auto">
+                        <SectionHeader title="Cabeçalho & Identidade Visual" desc="Personalize o título, cores e logo que aparecem no topo da tela." />
+                        
+                        {/* Live Preview Header */}
+                        <div className="bg-black border border-brewery-border rounded-lg p-2 mb-8 relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none z-20">
+                                <span className="text-[10px] font-mono text-white/50 uppercase tracking-widest">Preview em Tempo Real</span>
+                            </div>
+                            <header 
+                                className="flex justify-between items-center p-4 border rounded relative z-10 transition-colors duration-500"
+                                style={{
+                                    backgroundColor: layout.header.backgroundColor,
+                                    borderColor: '#452c20'
+                                }}
+                            >
+                                <div className={`flex items-center gap-4 flex-1 ${layout.header.alignment === 'CENTER' ? 'justify-center' : 'justify-start'}`}>
+                                    <div className={layout.header.alignment === 'CENTER' ? 'text-center' : 'text-left'}>
+                                        <h1 className="text-xl font-bold tracking-tight" style={{ color: layout.header.textColor }}>
+                                            {layout.header.title || 'Título da Aplicação'}
+                                        </h1>
+                                        {layout.header.subtitle && (
+                                            <p className="text-xs font-mono uppercase tracking-widest opacity-60" style={{ color: layout.header.textColor }}>{layout.header.subtitle}</p>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="col-span-1 md:col-span-3">
-                                    <label className="label-pro">Host / IP do Servidor</label>
-                                    <input 
-                                        className="input-pro font-mono"
-                                        placeholder="localhost ou 192.168.1.50"
-                                        value={connectionConfig.host}
-                                        onChange={(e) => updateConnectionConfig({ host: e.target.value })}
-                                    />
+                            </header>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* LEFT: TEXT & COLOR */}
+                            <div className="space-y-6">
+                                <h3 className="text-sm font-bold text-white uppercase border-b border-white/5 pb-2">Conteúdo e Cores</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="label-pro">Título Principal</label>
+                                        <input 
+                                            className="input-pro font-bold" 
+                                            value={layout.header.title} 
+                                            onChange={(e) => updateLayout({ header: { ...layout.header, title: e.target.value } })} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label-pro">Subtítulo (Opcional)</label>
+                                        <input 
+                                            className="input-pro font-mono text-xs" 
+                                            value={layout.header.subtitle} 
+                                            onChange={(e) => updateLayout({ header: { ...layout.header, subtitle: e.target.value } })} 
+                                        />
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="label-pro flex items-center gap-2"><Palette size={12}/> Cor do Texto</label>
+                                            <div className="flex gap-2 items-center">
+                                                <input 
+                                                    type="color" 
+                                                    className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                                                    value={layout.header.textColor}
+                                                    onChange={(e) => updateLayout({ header: { ...layout.header, textColor: e.target.value } })}
+                                                />
+                                                <input 
+                                                    className="input-pro py-1 text-xs font-mono uppercase" 
+                                                    value={layout.header.textColor} 
+                                                    onChange={(e) => updateLayout({ header: { ...layout.header, textColor: e.target.value } })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="label-pro flex items-center gap-2"><Palette size={12}/> Cor de Fundo</label>
+                                            <div className="flex gap-2 items-center">
+                                                <input 
+                                                    type="color" 
+                                                    className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                                                    value={layout.header.backgroundColor}
+                                                    onChange={(e) => updateLayout({ header: { ...layout.header, backgroundColor: e.target.value } })}
+                                                />
+                                                <input 
+                                                    className="input-pro py-1 text-xs font-mono uppercase" 
+                                                    value={layout.header.backgroundColor} 
+                                                    onChange={(e) => updateLayout({ header: { ...layout.header, backgroundColor: e.target.value } })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="label-pro">Alinhamento do Texto</label>
+                                        <div className="flex gap-2 bg-black/30 p-1 rounded-lg border border-white/5 w-fit">
+                                            <button 
+                                                onClick={() => updateLayout({ header: { ...layout.header, alignment: 'LEFT' } })}
+                                                className={`p-2 rounded transition-all ${layout.header.alignment === 'LEFT' ? 'bg-brewery-accent text-black' : 'text-brewery-muted hover:bg-white/5'}`}
+                                            >
+                                                <AlignLeft size={20} />
+                                            </button>
+                                            <button 
+                                                onClick={() => updateLayout({ header: { ...layout.header, alignment: 'CENTER' } })}
+                                                className={`p-2 rounded transition-all ${layout.header.alignment === 'CENTER' ? 'bg-brewery-accent text-black' : 'text-brewery-muted hover:bg-white/5'}`}
+                                            >
+                                                <AlignCenter size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Port & Path */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <div className="col-span-1">
-                                    <label className="label-pro">Porta</label>
-                                    <input 
-                                        className="input-pro font-mono"
-                                        placeholder="1880"
-                                        value={connectionConfig.port}
-                                        onChange={(e) => updateConnectionConfig({ port: e.target.value })}
-                                    />
+                            {/* RIGHT: MEDIA & LOGO */}
+                            <div className="space-y-6">
+                                {/* Banner Config */}
+                                <div className="bg-brewery-card/50 border border-brewery-border rounded-lg p-5">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h4 className="text-sm font-bold text-white flex items-center gap-2"><CreditCard size={14} className="text-indigo-400"/> Banner Superior</h4>
+                                            <p className="text-[10px] text-brewery-muted mt-1">Habilite uma área de mídia fixa acima do cabeçalho.</p>
+                                        </div>
+                                        <Toggle checked={layout.header.showTopMedia} onChange={() => updateLayout({ header: { ...layout.header, showTopMedia: !layout.header.showTopMedia } })} />
+                                    </div>
+                                    
+                                    {layout.header.showTopMedia && (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                            <div>
+                                                <label className="label-pro flex justify-between">
+                                                    <span>Altura (px)</span>
+                                                    <span className="text-indigo-400">{layout.header.topMediaHeight}px</span>
+                                                </label>
+                                                <input 
+                                                    type="range" min="50" max="400" step="10" 
+                                                    className="w-full accent-indigo-500"
+                                                    value={layout.header.topMediaHeight}
+                                                    onChange={(e) => updateLayout({ header: { ...layout.header, topMediaHeight: parseInt(e.target.value) } })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="label-pro flex justify-between">
+                                                    <span>Espessura da Borda</span>
+                                                    <span className="text-indigo-400">{layout.header.topMediaBorderWidth || 0}px</span>
+                                                </label>
+                                                <input 
+                                                    type="range" min="0" max="10" step="1" 
+                                                    className="w-full accent-indigo-500"
+                                                    value={layout.header.topMediaBorderWidth || 0}
+                                                    onChange={(e) => updateLayout({ header: { ...layout.header, topMediaBorderWidth: parseInt(e.target.value) } })}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="col-span-1 md:col-span-3">
-                                    <label className="label-pro">Caminho (Path/Topic)</label>
-                                    <input 
-                                        className="input-pro font-mono"
-                                        placeholder="/ws/brewery-data"
-                                        value={connectionConfig.path}
-                                        onChange={(e) => updateConnectionConfig({ path: e.target.value })}
-                                    />
-                                </div>
-                            </div>
 
-                            {/* Authentication */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                                <div className="col-span-1">
-                                    <label className="label-pro">Usuário (Opcional)</label>
-                                    <input 
-                                        className="input-pro"
-                                        placeholder="admin"
-                                        value={connectionConfig.username || ''}
-                                        onChange={(e) => updateConnectionConfig({ username: e.target.value })}
-                                    />
-                                </div>
-                                <div className="col-span-1">
-                                    <label className="label-pro">Senha (Opcional)</label>
-                                    <input 
-                                        type="password"
-                                        className="input-pro"
-                                        placeholder="••••••"
-                                        value={connectionConfig.password || ''}
-                                        onChange={(e) => updateConnectionConfig({ password: e.target.value })}
-                                    />
-                                </div>
-                            </div>
+                                {/* Logo Config */}
+                                <div className="bg-brewery-card/50 border border-brewery-border rounded-lg p-5">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h4 className="text-sm font-bold text-white flex items-center gap-2"><ImageIcon size={14} className="text-emerald-400"/> Logo Flutuante</h4>
+                                            <p className="text-[10px] text-brewery-muted mt-1">Um widget de imagem arrastável sobre a tela.</p>
+                                        </div>
+                                        <Toggle checked={layout.logoWidget.show} onChange={() => updateLayout({ logoWidget: { ...layout.logoWidget, show: !layout.logoWidget.show } })} />
+                                    </div>
 
-                            <div className="border-t border-brewery-border my-2"></div>
-
-                            {/* Status & Actions */}
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${connectionConfig.autoConnect ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                    <span className="text-sm font-bold text-brewery-muted">Conexão Automática {connectionConfig.autoConnect ? 'Ativada' : 'Desativada'}</span>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button 
-                                        onClick={handleTestConnection}
-                                        disabled={testStatus === 'TESTING'}
-                                        className={`btn-ghost border border-white/10 ${
-                                            testStatus === 'SUCCESS' ? 'text-emerald-400 border-emerald-500/50' : 
-                                            testStatus === 'ERROR' ? 'text-rose-500 border-rose-500/50' : ''
-                                        }`}
-                                    >
-                                        {testStatus === 'TESTING' ? <RefreshCw className="animate-spin" size={18} /> : 
-                                         testStatus === 'SUCCESS' ? <CheckCircle size={18} /> : 
-                                         testStatus === 'ERROR' ? <AlertTriangle size={18} /> : 
-                                         <Activity size={18} />}
-                                        <span className="ml-2">{
-                                            testStatus === 'TESTING' ? 'Testando...' : 
-                                            testStatus === 'SUCCESS' ? 'Conexão OK' : 
-                                            testStatus === 'ERROR' ? 'Falha' : 
-                                            'Testar Conexão'
-                                        }</span>
-                                    </button>
+                                    {layout.logoWidget.show && (
+                                        <div className="flex items-center gap-4 mt-4">
+                                            <div className="w-16 h-16 bg-black rounded border border-white/10 flex items-center justify-center relative overflow-hidden group">
+                                                {layout.logoWidget.url ? (
+                                                    <img src={layout.logoWidget.url} className="w-full h-full object-contain" />
+                                                ) : <ImageIcon className="text-brewery-muted" />}
+                                                
+                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <label className="cursor-pointer p-1 text-white hover:text-emerald-400">
+                                                        <Upload size={14} />
+                                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && processImage(e.target.files[0], true, 'LOGO')} />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-[10px] text-brewery-muted mb-2">Clique na imagem para alterar. Use o mouse na tela principal para posicionar e redimensionar.</p>
+                                                <div className="flex gap-2">
+                                                    <div className="bg-black/20 px-2 py-1 rounded text-[10px] font-mono border border-white/5 text-zinc-400">
+                                                        X: {layout.logoWidget.x.toFixed(0)}
+                                                    </div>
+                                                    <div className="bg-black/20 px-2 py-1 rounded text-[10px] font-mono border border-white/5 text-zinc-400">
+                                                        Y: {layout.logoWidget.y.toFixed(0)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+                
+                {/* --- TAB: LAYOUT & MEDIA (Combined/Optimized) --- */}
+                {activeTab === 'MEDIA' && (
+                    <div className="space-y-6 max-w-5xl mx-auto h-full flex flex-col">
+                         <SectionHeader title="Gerenciador de Janelas & Mídia" desc="Crie janelas flutuantes (PIP) e gerencie o conteúdo de cada uma." />
 
-                        {/* --- DEBUG CONSOLE (NEW) --- */}
-                        <div className="bg-black/95 border border-brewery-border rounded-lg overflow-hidden flex flex-col shadow-inner h-[300px]">
-                            {/* Terminal Header */}
-                            <div className="flex justify-between items-center bg-zinc-900/50 p-2 border-b border-white/10">
-                                <div className="flex items-center gap-2 px-2">
-                                    <Terminal size={14} className="text-emerald-400" />
-                                    <span className="text-xs font-mono font-bold text-zinc-300">RECEBIMENTO DE DADOS EM TEMPO REAL</span>
+                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+                            {/* LEFT COL: WINDOW LIST & GLOBAL SETTINGS */}
+                            <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+                                {/* Global Settings Card */}
+                                <div className="bg-brewery-card border border-brewery-border rounded-lg p-4">
+                                    <h3 className="text-xs font-bold text-brewery-muted uppercase tracking-widest mb-3">Ajustes Globais</h3>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="text-sm font-bold text-white flex items-center gap-2">
+                                            <Expand size={14} /> Preenchimento de Mídia
+                                        </label>
+                                        <div className="flex bg-black/40 rounded p-0.5 border border-white/10">
+                                            <button 
+                                                onClick={() => updateLayout({ mediaFit: 'CONTAIN' })}
+                                                className={`px-2 py-1 text-[10px] rounded font-bold transition-colors ${layout.mediaFit === 'CONTAIN' ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            >
+                                                CONTAIN
+                                            </button>
+                                            <button 
+                                                onClick={() => updateLayout({ mediaFit: 'COVER' })}
+                                                className={`px-2 py-1 text-[10px] rounded font-bold transition-colors ${layout.mediaFit === 'COVER' ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            >
+                                                COVER
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500">Define como imagens e vídeos se comportam dentro das janelas.</p>
                                 </div>
-                                <div className="flex gap-2">
+
+                                {/* Window List Manager */}
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                        <h3 className="text-xs font-bold text-brewery-muted uppercase tracking-widest">Janelas Ativas</h3>
+                                        <button 
+                                            onClick={() => addWindow(`Janela ${layout.floatingWindows.length + 1}`)}
+                                            className="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors"
+                                        >
+                                            <Plus size={10} /> Nova Janela
+                                        </button>
+                                    </div>
+
+                                    {layout.floatingWindows.map(win => (
+                                        <div 
+                                            key={win.id}
+                                            onClick={() => setSelectedPlaylist(win.id)}
+                                            className={`p-3 rounded-lg border cursor-pointer transition-all group ${
+                                                selectedPlaylist === win.id 
+                                                ? 'bg-indigo-900/20 border-indigo-500 shadow-lg shadow-indigo-900/20' 
+                                                : 'bg-black/20 border-white/5 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Monitor size={14} className={selectedPlaylist === win.id ? 'text-indigo-400' : 'text-zinc-600'} />
+                                                    <span className={`font-bold text-sm ${selectedPlaylist === win.id ? 'text-white' : 'text-zinc-400'}`}>{win.name}</span>
+                                                </div>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); removeWindow(win.id); }}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-rose-500/20 hover:text-rose-500 rounded transition-all"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+
+                                            {/* Quick Stats/Edit - OPTIMIZED LAYOUT */}
+                                            {selectedPlaylist === win.id && (
+                                                <div className="space-y-3 mt-3 pt-3 border-t border-white/5 animate-in fade-in slide-in-from-top-1">
+                                                    <div>
+                                                        <label className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1 mb-1">
+                                                            <Type size={10}/> Nome da Janela
+                                                        </label>
+                                                        <input 
+                                                            className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                                                            value={win.name}
+                                                            onChange={(e) => updateWindow(win.id, { name: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1 mb-1">
+                                                                <ArrowRightLeft size={10}/> Largura (px)
+                                                            </label>
+                                                            <input 
+                                                                type="number"
+                                                                className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-zinc-300 font-mono focus:border-indigo-500 focus:outline-none"
+                                                                value={win.w}
+                                                                onChange={(e) => updateWindow(win.id, { w: parseInt(e.target.value) })}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1 mb-1">
+                                                                <ArrowUp size={10}/> Altura (px)
+                                                            </label>
+                                                            <input 
+                                                                type="number"
+                                                                className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-zinc-300 font-mono focus:border-indigo-500 focus:outline-none"
+                                                                value={win.h}
+                                                                onChange={(e) => updateWindow(win.id, { h: parseInt(e.target.value) })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    <div 
+                                        onClick={() => setSelectedPlaylist('banner')}
+                                        className={`p-3 rounded-lg border cursor-pointer transition-all flex items-center gap-2 ${
+                                            selectedPlaylist === 'banner' 
+                                            ? 'bg-amber-900/20 border-amber-500 shadow-lg shadow-amber-900/20' 
+                                            : 'bg-black/20 border-white/5 hover:border-white/20'
+                                        }`}
+                                    >
+                                        <CreditCard size={14} className={selectedPlaylist === 'banner' ? 'text-amber-400' : 'text-zinc-600'} />
+                                        <span className={`font-bold text-sm ${selectedPlaylist === 'banner' ? 'text-white' : 'text-zinc-400'}`}>Banner Superior (Fixo)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* RIGHT COL: PLAYLIST CONTENT */}
+                            <div className="lg:col-span-2 bg-black/40 border border-white/10 rounded-xl overflow-hidden flex flex-col">
+                                <div className="p-3 border-b border-white/10 bg-black/20 flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <List size={14} className="text-indigo-400" />
+                                        <span className="text-xs font-bold uppercase tracking-wider text-white">
+                                            Conteúdo: {selectedPlaylist === 'banner' ? 'Banner Superior' : layout.floatingWindows.find(w => w.id === selectedPlaylist)?.name || 'Desconhecido'}
+                                        </span>
+                                    </div>
+                                    <div className="text-[10px] text-zinc-500">
+                                        {playlists[selectedPlaylist]?.length || 0} Itens
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                                    {(!playlists[selectedPlaylist] || playlists[selectedPlaylist].length === 0) ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-zinc-600 opacity-60">
+                                            <Monitor size={48} className="mb-2" />
+                                            <p className="text-sm">Esta playlist está vazia.</p>
+                                            <p className="text-xs">Use o painel de mídia na tela principal para adicionar conteúdo.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {playlists[selectedPlaylist].map((item, index) => (
+                                                <div key={item.id} className="flex items-center gap-3 p-2 bg-black/40 border border-white/5 rounded hover:border-white/20 transition-colors group">
+                                                    <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0 font-mono text-xs">
+                                                        {index + 1}
+                                                    </div>
+                                                    <div className="w-12 h-8 rounded bg-black border border-white/10 overflow-hidden shrink-0">
+                                                        {item.type === 'VIDEO' ? <div className="w-full h-full bg-indigo-900/50 flex items-center justify-center"><Play size={10} className="text-white"/></div> : 
+                                                         <img src={item.url} className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs text-white truncate">{item.name}</p>
+                                                        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                                                            <span className="uppercase">{item.type}</span>
+                                                            {item.type !== 'VIDEO' && (
+                                                                <span className="flex items-center gap-1 bg-white/5 px-1 rounded">
+                                                                    <Timer size={8} /> {item.duration}s
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {item.type !== 'VIDEO' && (
+                                                            <input 
+                                                                type="number"
+                                                                className="w-12 bg-black border border-white/20 rounded px-1 text-[10px] text-center"
+                                                                value={item.duration}
+                                                                onChange={(e) => updateMedia(selectedPlaylist, item.id, { duration: parseInt(e.target.value) })}
+                                                                title="Duração (segundos)"
+                                                            />
+                                                        )}
+                                                        <button 
+                                                            onClick={() => removeMedia(selectedPlaylist, item.id)}
+                                                            className="p-1.5 hover:bg-rose-500/20 hover:text-rose-500 rounded"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                         </div>
+                    </div>
+                )}
+
+                {/* --- TAB: PARTY MODE --- */}
+                {activeTab === 'PARTY' && (
+                    <div className="space-y-8 max-w-4xl mx-auto">
+                        <SectionHeader title="Modo Festa & Comemoração" desc="Ative efeitos visuais especiais para celebrar metas batidas ou eventos." />
+
+                        {/* MASTER TOGGLE CARD */}
+                        <div className={`p-6 rounded-2xl border transition-all duration-500 flex flex-col items-center text-center gap-4 ${layout.isPartyMode ? 'bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-purple-500 shadow-[0_0_50px_rgba(168,85,247,0.15)]' : 'bg-brewery-card border-brewery-border'}`}>
+                             <div className={`p-4 rounded-full ${layout.isPartyMode ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/50 animate-bounce' : 'bg-black/40 text-zinc-600'}`}>
+                                <PartyPopper size={32} />
+                             </div>
+                             <div>
+                                <h3 className={`text-2xl font-black uppercase tracking-tight ${layout.isPartyMode ? 'text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400' : 'text-zinc-500'}`}>
+                                    {layout.isPartyMode ? 'Modo Festa Ativado!' : 'Modo Festa Desativado'}
+                                </h3>
+                                <p className="text-sm text-zinc-400 mt-2 max-w-md mx-auto">
+                                    Quando ativo, o sistema exibe animações sobrepostas, altera as cores do tema e destaca a mensagem de comemoração.
+                                </p>
+                             </div>
+                             <div className="scale-150 mt-2">
+                                <Toggle checked={layout.isPartyMode} onChange={() => updateLayout({ isPartyMode: !layout.isPartyMode })} color="purple" />
+                             </div>
+                        </div>
+
+                        {/* CONFIG GRID */}
+                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 transition-opacity duration-300 ${!layout.isPartyMode ? 'opacity-50 pointer-events-none grayscale' : 'opacity-100'}`}>
+                            {/* Message Config */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-white uppercase border-b border-white/5 pb-2">Mensagem do Banner</h4>
+                                <div>
+                                    <label className="label-pro">Texto de Celebração</label>
+                                    <input 
+                                        className="input-pro border-purple-500/30 focus:border-purple-500 font-bold text-lg text-purple-200 bg-purple-900/10"
+                                        value={layout.partyMessage || ''}
+                                        onChange={(e) => updateLayout({ partyMessage: e.target.value })}
+                                        placeholder="EX: META BATIDA! PARABÉNS TIME!"
+                                    />
+                                </div>
+                                
+                                {/* Custom Image Upload */}
+                                <div className="pt-4">
+                                    <h4 className="text-sm font-bold text-white uppercase border-b border-white/5 pb-2 mb-4">Imagem Personalizada (Partícula)</h4>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="w-24 h-24 bg-black rounded-lg border border-purple-500/30 flex items-center justify-center relative overflow-hidden group">
+                                            {layout.customPartyImage ? (
+                                                <img src={layout.customPartyImage} className="w-full h-full object-contain p-2" />
+                                            ) : (
+                                                <ImageIcon className="text-purple-500/30" />
+                                            )}
+                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                 <label className="cursor-pointer p-2 text-white hover:text-purple-400">
+                                                    <Upload size={20} />
+                                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && processImage(e.target.files[0], true, 'PARTY')} />
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 text-xs text-zinc-400">
+                                            <p className="mb-2">Faça upload de uma imagem (ex: foto do funcionário do mês, logo de um cliente) para usar como chuva de partículas.</p>
+                                            <p className="text-purple-400 font-bold">O fundo será removido automaticamente.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Effect Selector Grid */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-white uppercase border-b border-white/5 pb-2">Escolha o Efeito Visual</h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[
+                                        { id: 'CONFETTI', label: 'Confetes', icon: <PartyPopper size={18}/>, desc: 'Coloridos' },
+                                        { id: 'BUBBLES', label: 'Bolhas', icon: <Wind size={18}/>, desc: 'Cervejaria' },
+                                        { id: 'DISCO', label: 'Disco', icon: <Disc size={18}/>, desc: 'Luzes Strobo' },
+                                        { id: 'GLOW', label: 'Neon', icon: <Sparkles size={18}/>, desc: 'Brilho Suave' },
+                                        { id: 'WORLDCUP', label: 'Brasil', icon: <Flag size={18}/>, desc: 'Verde/Amarelo' },
+                                        { id: 'OLYMPICS', label: 'Olimpíadas', icon: <Medal size={18}/>, desc: 'Anéis' },
+                                        { id: 'BIRTHDAY', label: 'Aniversário', icon: <Cake size={18}/>, desc: 'Balões' },
+                                        { id: 'BONUS', label: 'Bônus', icon: <Banknote size={18}/>, desc: 'Chuva de $' },
+                                        { id: 'GOAL', label: 'Meta', icon: <Trophy size={18}/>, desc: 'Estrelas/Taças' },
+                                        { id: 'CUSTOM', label: 'Custom', icon: <ImageIcon size={18}/>, desc: 'Sua Imagem' },
+                                    ].map(eff => (
+                                        <EffectCard 
+                                            key={eff.id}
+                                            active={layout.partyEffect === eff.id}
+                                            onClick={() => updateLayout({ partyEffect: eff.id as any })}
+                                            icon={eff.icon}
+                                            label={eff.label}
+                                            description={eff.desc}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- TAB: API CONNECTION --- */}
+                {activeTab === 'API' && (
+                    <div className="space-y-6 max-w-4xl mx-auto">
+                        <SectionHeader title="Conexão Industrial" desc="Gerencie a conexão MQTT e mapeie as tags de dados para cada linha." />
+                        
+                        {/* API Sub-Navigation */}
+                        <div className="flex bg-black/40 p-1 rounded-lg border border-brewery-border mb-6 w-fit">
+                            <button 
+                                onClick={() => setApiSubTab('CONNECTION')}
+                                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-all flex items-center gap-2 ${apiSubTab === 'CONNECTION' ? 'bg-brewery-accent text-black shadow' : 'text-brewery-muted hover:text-white'}`}
+                            >
+                                <Network size={16} /> Configuração Broker
+                            </button>
+                            <button 
+                                onClick={() => setApiSubTab('TAGS')}
+                                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-all flex items-center gap-2 ${apiSubTab === 'TAGS' ? 'bg-brewery-accent text-black shadow' : 'text-brewery-muted hover:text-white'}`}
+                            >
+                                <Tags size={16} /> Mapeamento de Tags
+                            </button>
+                        </div>
+
+                        {apiSubTab === 'CONNECTION' && (
+                            <div className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden animate-in fade-in slide-in-from-left-4 duration-300">
+                                {/* Visual Connection Status Header */}
+                                <div className="bg-black/40 p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all duration-500 ${
+                                            connectionStatus === 'CONNECTED' ? 'bg-emerald-900/20 border-emerald-500 text-emerald-500 shadow-emerald-900/40' :
+                                            connectionStatus === 'CONNECTING' ? 'bg-blue-900/20 border-blue-500 text-blue-500 animate-pulse' :
+                                            'bg-rose-900/20 border-rose-500 text-rose-500'
+                                        }`}>
+                                            {connectionStatus === 'CONNECTED' ? <Wifi size={32} /> : 
+                                             connectionStatus === 'CONNECTING' ? <RefreshCw size={32} className="animate-spin" /> : 
+                                             <Wifi size={32} className="opacity-50" />}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                                                {connectionStatus === 'CONNECTED' ? 'ONLINE' : 
+                                                 connectionStatus === 'CONNECTING' ? 'CONECTANDO...' : 'OFFLINE'}
+                                            </h3>
+                                            <div className="flex items-center gap-4 mt-1">
+                                                <div className="flex items-center gap-1.5 text-xs font-mono text-brewery-muted">
+                                                    <Server size={12} />
+                                                    {connectionConfig.protocol}://{connectionConfig.host}:{connectionConfig.port}
+                                                </div>
+                                                {connectionStatus === 'CONNECTED' && (
+                                                    <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-400">
+                                                        <Activity size={12} />
+                                                        {ping}ms
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                         <button 
+                                            onClick={handleTestConnection}
+                                            disabled={testStatus === 'TESTING'}
+                                            className={`px-6 py-3 rounded-lg font-bold border transition-all flex items-center gap-2 uppercase tracking-wider text-sm ${
+                                                testStatus === 'SUCCESS' ? 'bg-emerald-500 text-black border-emerald-500' : 
+                                                testStatus === 'ERROR' ? 'bg-rose-500 text-white border-rose-500' : 
+                                                'bg-white/10 border-white/10 text-white hover:bg-white/20'
+                                            }`}
+                                        >
+                                            {testStatus === 'TESTING' ? <RefreshCw className="animate-spin" size={16} /> : 
+                                            testStatus === 'SUCCESS' ? <CheckCircle size={16} /> : 
+                                            testStatus === 'ERROR' ? <AlertTriangle size={16} /> : 
+                                            <ArrowRightLeft size={16} />}
+                                            <span>Testar Ping</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        <div className="col-span-1">
+                                            <label className="label-pro">Protocolo</label>
+                                            <select 
+                                                className="input-pro"
+                                                value={connectionConfig.protocol}
+                                                onChange={(e) => updateConnectionConfig({ protocol: e.target.value as 'ws' | 'wss' })}
+                                            >
+                                                <option value="ws">WS:// (Padrão)</option>
+                                                <option value="wss">WSS:// (Seguro)</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-span-1 md:col-span-3">
+                                            <label className="label-pro">Host / IP do Broker</label>
+                                            <div className="relative">
+                                                <Globe size={14} className="absolute left-3 top-3 text-brewery-muted"/>
+                                                <input 
+                                                    className="input-pro pl-9 font-mono"
+                                                    placeholder="localhost ou 192.168.1.50"
+                                                    value={connectionConfig.host}
+                                                    onChange={(e) => updateConnectionConfig({ host: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        <div className="col-span-1">
+                                            <label className="label-pro">Porta</label>
+                                            <div className="relative">
+                                                <Hash size={14} className="absolute left-3 top-3 text-brewery-muted"/>
+                                                <input 
+                                                    className="input-pro pl-9 font-mono"
+                                                    placeholder="1880"
+                                                    value={connectionConfig.port}
+                                                    onChange={(e) => updateConnectionConfig({ port: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="col-span-1 md:col-span-3">
+                                            <label className="label-pro">Topic / Path (Rota WebSocket)</label>
+                                            <div className="relative">
+                                                <Network size={14} className="absolute left-3 top-3 text-brewery-muted"/>
+                                                <input 
+                                                    className="input-pro pl-9 font-mono"
+                                                    placeholder="/ws/brewery-data"
+                                                    value={connectionConfig.path}
+                                                    onChange={(e) => updateConnectionConfig({ path: e.target.value })}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-brewery-muted mt-2 flex items-center gap-1">
+                                                <Info size={10} /> O endpoint deve suportar conexão WebSocket.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <Toggle checked={connectionConfig.autoConnect} onChange={() => updateConnectionConfig({ autoConnect: !connectionConfig.autoConnect })} />
+                                            <div>
+                                                <span className="text-sm font-bold text-white block">Conexão Automática</span>
+                                                <span className="text-xs text-brewery-muted">Reconectar ao iniciar ou em caso de queda.</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-[10px] text-zinc-500 font-mono">
+                                            Client ID: IV-PRO-{Math.floor(Math.random()*1000)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {apiSubTab === 'TAGS' && (
+                             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg flex items-start gap-3">
+                                    <Info size={18} className="text-blue-400 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="text-sm text-blue-200 font-bold">Dicionário de Dados</p>
+                                        <p className="text-xs text-blue-300/70 mt-1">Defina o caminho JSON (ex: <code className="bg-black/30 px-1 rounded">payload.temp</code>) para cada variável de cada equipamento. Use o Terminal abaixo para ver a estrutura dos dados recebidos.</p>
+                                    </div>
+                                </div>
+
+                                {lineConfigs.map((line) => (
+                                    <div key={line.id} className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden">
+                                        <div className="bg-black/20 p-3 border-b border-white/5 flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center text-brewery-muted text-xs font-bold border border-white/10">
+                                                {line.id.substring(0,3)}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white">{line.name}</h4>
+                                                <span className="text-[10px] text-brewery-muted font-mono">{line.id}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Database size={10} /> Volume (Total)</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-emerald-400/90 bg-black/40 border-white/5 focus:border-emerald-500/50" 
+                                                        value={line.dataMapping?.productionKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, productionKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Gauge size={10} /> Velocidade</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-blue-400/90 bg-black/40 border-white/5 focus:border-blue-500/50" 
+                                                        value={line.dataMapping?.speedKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, speedKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Activity size={10} /> Temperatura</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-amber-400/90 bg-black/40 border-white/5 focus:border-amber-500/50" 
+                                                        value={line.dataMapping?.temperatureKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, temperatureKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Zap size={10} /> Eficiência/OEE</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-purple-400/90 bg-black/40 border-white/5 focus:border-purple-500/50" 
+                                                        value={line.dataMapping?.efficiencyKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, efficiencyKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Info size={10} /> Status (String)</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-zinc-300/90 bg-black/40 border-white/5 focus:border-zinc-500/50" 
+                                                        value={line.dataMapping?.statusKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, statusKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Visibility Toggle Shortcuts */}
+                                            <div className="flex items-end pb-1 gap-2">
+                                                <button 
+                                                    onClick={() => updateLine(line.id, { display: { ...line.display, showTemp: !line.display.showTemp } })}
+                                                    className={`p-1.5 rounded border transition-colors ${line.display.showTemp ? 'bg-amber-500/20 border-amber-500 text-amber-500' : 'bg-black/20 border-white/5 text-zinc-600'}`}
+                                                    title="Toggle Temp Visibility"
+                                                >
+                                                    <Activity size={14} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => updateLine(line.id, { display: { ...line.display, showVolume: !line.display.showVolume } })}
+                                                    className={`p-1.5 rounded border transition-colors ${line.display.showVolume ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500' : 'bg-black/20 border-white/5 text-zinc-600'}`}
+                                                    title="Toggle Volume Visibility"
+                                                >
+                                                    <Database size={14} />
+                                                </button>
+                                                <div className="text-[9px] text-zinc-600 self-center ml-1">Visibilidade Rápida</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                             </div>
+                        )}
+
+                        {/* --- DEBUG TERMINAL (ALWAYS VISIBLE IN API TAB) --- */}
+                        <div className="bg-[#0c0c0c] border border-white/10 rounded-lg overflow-hidden shadow-2xl flex flex-col h-80 animate-in slide-in-from-bottom-4 fade-in">
+                            {/* Terminal Header */}
+                            <div className="flex justify-between items-center p-2 bg-white/5 border-b border-white/10">
+                                <div className="flex items-center gap-2 text-xs font-mono font-bold text-brewery-muted px-2">
+                                    <Terminal size={14} className="text-brewery-accent" />
+                                    <span>Terminal de Telemetria (Live)</span>
+                                </div>
+                                <div className="flex gap-1">
                                     <button 
                                         onClick={() => setIsLogPaused(!isLogPaused)} 
-                                        className={`p-1.5 rounded hover:bg-white/10 transition-colors ${isLogPaused ? 'text-amber-400 bg-amber-900/20' : 'text-zinc-400'}`}
-                                        title={isLogPaused ? "Resumir" : "Pausar"}
+                                        className={`p-1.5 rounded transition-colors ${isLogPaused ? 'bg-amber-500/20 text-amber-500' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
+                                        title={isLogPaused ? "Resume" : "Pause"}
                                     >
-                                        {isLogPaused ? <Play size={14} /> : <Pause size={14} />}
+                                        {isLogPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />}
                                     </button>
                                     <button 
                                         onClick={() => setConsoleLogs([])} 
-                                        className="p-1.5 rounded text-zinc-400 hover:text-rose-400 hover:bg-white/10 transition-colors"
-                                        title="Limpar Console"
+                                        className="p-1.5 rounded text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                        title="Clear Console"
                                     >
                                         <Eraser size={14} />
                                     </button>
@@ -650,18 +1349,26 @@ const SettingsPanel: React.FC = () => {
                             </div>
                             
                             {/* Terminal Body */}
-                            <div className="flex-1 overflow-y-auto p-4 font-mono text-[10px] md:text-xs space-y-2 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto p-3 font-mono text-[10px] md:text-xs custom-scrollbar">
                                 {consoleLogs.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2">
-                                        <Activity size={24} className="opacity-50" />
-                                        <p>Aguardando dados do WebSocket...</p>
+                                    <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-2 opacity-50">
+                                        <Bug size={32} />
+                                        <p>Aguardando dados...</p>
                                     </div>
                                 ) : (
                                     consoleLogs.map((log, i) => (
-                                        <div key={i} className="animate-in fade-in slide-in-from-left-2 duration-200">
-                                            <span className="text-zinc-500 mr-2">[{log.time}]</span>
-                                            <span className="text-emerald-500 font-bold mr-2">&gt;</span>
-                                            <span className="text-zinc-300 whitespace-pre-wrap break-all">{JSON.stringify(log.data)}</span>
+                                        <div key={i} className="mb-1 border-b border-white/5 pb-1 break-all last:border-0 hover:bg-white/5 transition-colors px-1 rounded">
+                                            <span className="text-zinc-500 select-none mr-2">[{log.time}]</span>
+                                            {log.data.error ? (
+                                                <span className="text-rose-500 font-bold">
+                                                    ERROR: {log.data.error}
+                                                    <span className="block text-rose-300/50 pl-4 text-[9px]">{typeof log.data.raw === 'string' ? log.data.raw : JSON.stringify(log.data.raw)}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-emerald-400/90">
+                                                    {JSON.stringify(log.data)}
+                                                </span>
+                                            )}
                                         </div>
                                     ))
                                 )}
@@ -671,150 +1378,128 @@ const SettingsPanel: React.FC = () => {
                     </div>
                 )}
 
-                {/* --- TAB: MEDIA & MENU --- */}
-                {activeTab === 'MEDIA' && (
-                    <div className="space-y-6 max-w-3xl mx-auto">
-                        <SectionHeader title="Gestão de Mídia" desc="Gerencie imagens e vídeos exibidos nos players." />
-
-                        {/* Playlist Selection */}
-                        <div className="flex gap-4 mb-6">
-                            <button 
-                                onClick={() => setSelectedPlaylist('floating')}
-                                className={`flex-1 py-4 px-6 rounded-lg border flex flex-col items-center gap-2 transition-all ${selectedPlaylist === 'floating' ? 'bg-brewery-accent text-black border-transparent shadow-lg' : 'bg-brewery-card border-brewery-border text-brewery-muted hover:border-brewery-muted'}`}
-                            >
-                                <Monitor size={24} />
-                                <span className="font-bold uppercase tracking-wider text-xs">Janela Flutuante</span>
-                            </button>
-                            <button 
-                                onClick={() => setSelectedPlaylist('banner')}
-                                className={`flex-1 py-4 px-6 rounded-lg border flex flex-col items-center gap-2 transition-all ${selectedPlaylist === 'banner' ? 'bg-brewery-accent text-black border-transparent shadow-lg' : 'bg-brewery-card border-brewery-border text-brewery-muted hover:border-brewery-muted'}`}
-                            >
-                                <Tv size={24} />
-                                <span className="font-bold uppercase tracking-wider text-xs">Banner Superior</span>
-                            </button>
-                        </div>
-
-                        {/* Media List */}
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden flex flex-col h-[400px]">
-                            <div className="p-4 bg-black/20 border-b border-brewery-border flex justify-between items-center">
-                                <span className="text-xs font-bold text-brewery-muted uppercase">Itens da Playlist ({currentMediaList.length})</span>
-                                {/* Note: Adding files is done via the specific MediaPanel on the HUD for drag-drop convenience, 
-                                    but we could add a button here too if needed. */}
-                            </div>
-                            
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                                {currentMediaList.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-brewery-muted opacity-50">
-                                        <Monitor size={48} className="mb-2"/>
-                                        <p>Nenhuma mídia nesta playlist</p>
-                                    </div>
-                                ) : (
-                                    currentMediaList.map((item, idx) => (
-                                        <div key={item.id} className="flex items-center gap-4 p-3 rounded bg-black/40 border border-white/5 group hover:border-white/10 transition-colors">
-                                            <div className="w-10 h-10 bg-black rounded overflow-hidden flex items-center justify-center text-brewery-muted shrink-0">
-                                                {item.type === 'IMAGE' ? <ImageIcon size={20} /> : <Monitor size={20} />}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-bold text-sm text-white truncate">{item.name}</p>
-                                                <div className="flex gap-2 text-[10px] text-brewery-muted uppercase items-center">
-                                                    <span>{item.type}</span>
-                                                    {item.type !== 'VIDEO' && (
-                                                        <div className="flex items-center gap-1 bg-black/40 rounded px-2 py-0.5 border border-white/10 ml-2 group-hover:border-white/30 transition-colors">
-                                                            <Clock size={10} className="text-brewery-muted" />
-                                                            <input 
-                                                                type="number" 
-                                                                min="1" 
-                                                                value={item.duration} 
-                                                                onChange={(e) => updateMedia(selectedPlaylist, item.id, { duration: Math.max(1, Number(e.target.value)) })}
-                                                                className="w-8 bg-transparent text-[10px] text-white text-center focus:outline-none appearance-none font-mono font-bold"
-                                                            />
-                                                            <span className="text-[9px] text-brewery-muted">seg</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => idx > 0 && reorderMedia(selectedPlaylist, idx, idx-1)} className="p-2 hover:bg-white/10 rounded disabled:opacity-20" disabled={idx === 0}><ArrowUp size={16}/></button>
-                                                <button onClick={() => idx < currentMediaList.length-1 && reorderMedia(selectedPlaylist, idx, idx+1)} className="p-2 hover:bg-white/10 rounded disabled:opacity-20" disabled={idx === currentMediaList.length-1}><ArrowDown size={16}/></button>
-                                                <button onClick={() => removeMedia(selectedPlaylist, item.id)} className="p-2 hover:bg-rose-950 text-rose-500 rounded ml-2"><Trash2 size={16}/></button>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* --- TAB: GENERAL ALERTS --- */}
+                {/* --- TAB: ALERTS (AVISOS GERAIS) --- */}
                 {activeTab === 'ALERTS' && (
-                    <div className="space-y-6 max-w-3xl mx-auto">
-                        <SectionHeader title="Avisos Gerais" desc="Mensagens importantes, alertas de segurança e comunicados." />
-
-                        {/* New Alert Form */}
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 space-y-4 shadow-lg relative overflow-hidden">
-                            <div className="flex flex-col md:flex-row gap-4">
-                                <div className="flex-1">
-                                    <label className="label-pro">Mensagem</label>
-                                    <input 
-                                        className="input-pro h-12 text-lg" 
-                                        placeholder="Ex: Reunião geral às 14h" 
-                                        value={newMsg}
-                                        onChange={(e) => setNewMsg(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && newMsg) {
-                                                addAnnouncement({ id: Date.now().toString(), message: newMsg, type: newType, displayMode: isOverlay ? 'OVERLAY' : 'TICKER', isActive: true });
-                                                setNewMsg('');
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                <div className="w-full md:w-48">
-                                    <label className="label-pro">Tipo</label>
-                                    <select 
-                                        className="input-pro h-12"
-                                        value={newType}
-                                        onChange={(e) => setNewType(e.target.value as AnnouncementType)}
-                                    >
-                                        <option value="INFO">Informação</option>
-                                        <option value="WARNING">Aviso</option>
-                                        <option value="CRITICAL">Crítico</option>
-                                        <option value="ATTENTION">Atenção</option>
-                                    </select>
+                    <div className="space-y-6 max-w-4xl mx-auto">
+                        {/* ... (Existing Alerts Code) ... */}
+                         <SectionHeader title="Avisos Gerais" desc="Crie comunicados para o rodapé (Ticker) ou alertas de tela cheia." />
+                         
+                         {/* ALERT CREATION CARD */}
+                         <div className="bg-brewery-card/50 border border-brewery-border rounded-xl p-6 space-y-6 shadow-xl backdrop-blur-sm">
+                            
+                            {/* 1. TYPE SELECTION (VISUAL BUTTONS) */}
+                            <div>
+                                <label className="label-pro mb-3">Selecione o Tipo de Alerta</label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {[
+                                        { type: 'INFO', label: 'Info', icon: <Info size={20} />, color: 'blue', border: 'border-blue-500', bg: 'bg-blue-500' },
+                                        { type: 'ATTENTION', label: 'Comunicado', icon: <Megaphone size={20} />, color: 'orange', border: 'border-orange-500', bg: 'bg-orange-500' },
+                                        { type: 'WARNING', label: 'Atenção', icon: <AlertTriangle size={20} />, color: 'amber', border: 'border-amber-500', bg: 'bg-amber-500' },
+                                        { type: 'CRITICAL', label: 'Crítico', icon: <AlertOctagon size={20} />, color: 'rose', border: 'border-rose-500', bg: 'bg-rose-500' },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.type}
+                                            onClick={() => setNewType(opt.type as AnnouncementType)}
+                                            className={`
+                                                relative p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all duration-200
+                                                ${newType === opt.type 
+                                                    ? `${opt.bg}/20 ${opt.border} text-white shadow-[0_0_15px_rgba(0,0,0,0.5)] ring-1 ring-white/20` 
+                                                    : 'bg-black/40 border-white/5 text-brewery-muted hover:bg-white/5 hover:border-white/20'
+                                                }
+                                            `}
+                                        >
+                                            <div className={`${newType === opt.type ? `text-${opt.color}-400` : ''}`}>
+                                                {opt.icon}
+                                            </div>
+                                            <span className="font-bold text-xs uppercase tracking-wider">{opt.label}</span>
+                                            {newType === opt.type && <div className={`absolute inset-0 rounded-xl bg-${opt.color}-500/5`} />}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
-                            {/* Scheduling */}
-                            <div className="grid grid-cols-2 gap-4 pt-2">
-                                <div>
-                                    <label className="label-pro">Início (Opcional)</label>
-                                    <input type="datetime-local" className="input-pro" value={scheduleStart} onChange={(e) => setScheduleStart(e.target.value)} />
+                            {/* 2. MESSAGE INPUT */}
+                            <div>
+                                <label className="label-pro">Mensagem do Aviso</label>
+                                <textarea 
+                                    className="input-pro h-24 font-bold text-lg resize-none leading-relaxed" 
+                                    placeholder="Digite a mensagem que será exibida..." 
+                                    value={newMsg}
+                                    onChange={(e) => setNewMsg(e.target.value)}
+                                    maxLength={140}
+                                />
+                                <div className="flex justify-between mt-1 px-1">
+                                    <span className="text-[10px] text-brewery-muted">Suporta emojis ⚠️ 🔥</span>
+                                    <span className="text-[10px] text-brewery-muted font-mono">{newMsg.length}/140</span>
                                 </div>
-                                <div>
-                                    <label className="label-pro">Fim (Opcional)</label>
-                                    <input type="datetime-local" className="input-pro" value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)} />
+                            </div>
+
+                            {/* 3. MODE & SCHEDULE GRID */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-black/20 rounded-xl border border-white/5">
+                                {/* Mode Toggle */}
+                                <div className="space-y-3">
+                                    <label className="label-pro flex items-center gap-2"><Monitor size={14}/> Modo de Exibição</label>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => setIsOverlay(false)}
+                                            className={`flex-1 p-3 rounded-lg border text-xs font-bold uppercase transition-all flex flex-col items-center gap-2 ${!isOverlay ? 'bg-brewery-accent/20 border-brewery-accent text-white' : 'bg-black/40 border-white/10 text-brewery-muted'}`}
+                                        >
+                                            <Rss size={18} />
+                                            Rodapé (Ticker)
+                                        </button>
+                                        <button 
+                                            onClick={() => setIsOverlay(true)}
+                                            className={`flex-1 p-3 rounded-lg border text-xs font-bold uppercase transition-all flex flex-col items-center gap-2 ${isOverlay ? 'bg-rose-500/20 border-rose-500 text-white' : 'bg-black/40 border-white/10 text-brewery-muted'}`}
+                                        >
+                                            <Maximize size={18} />
+                                            Tela Cheia
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-brewery-muted leading-tight">
+                                        {isOverlay 
+                                            ? "Interrompe a visualização com um alerta pop-up no centro da tela." 
+                                            : "Passa uma mensagem contínua na barra inferior sem interromper."}
+                                    </p>
+                                </div>
+
+                                {/* Scheduling */}
+                                <div className="space-y-3 border-l border-white/10 pl-0 md:pl-6">
+                                     <label className="label-pro flex items-center gap-2"><CalendarClock size={14}/> Agendamento (Opcional)</label>
+                                     <div className="grid grid-cols-1 gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-brewery-muted w-8">Início</span>
+                                            <input 
+                                                type="datetime-local" 
+                                                className="input-pro py-1 text-xs bg-black border-white/10"
+                                                value={scheduleStart}
+                                                onChange={(e) => setScheduleStart(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-brewery-muted w-8">Fim</span>
+                                            <input 
+                                                type="datetime-local" 
+                                                className="input-pro py-1 text-xs bg-black border-white/10"
+                                                value={scheduleEnd}
+                                                onChange={(e) => setScheduleEnd(e.target.value)}
+                                            />
+                                        </div>
+                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="flex justify-between items-center pt-2">
-                                <div className="flex items-center gap-3 bg-black/30 px-3 py-2 rounded-lg border border-white/5">
-                                    <Toggle checked={isOverlay} onChange={() => setIsOverlay(!isOverlay)} />
-                                    <div>
-                                        <span className="text-sm font-bold block text-white">{isOverlay ? 'Modo Overlay (Tela Cheia)' : 'Modo Ticker (Rodapé)'}</span>
-                                        <span className="text-[10px] text-brewery-muted block">{isOverlay ? 'Interrompe a visualização com pop-up' : 'Passa texto na barra inferior'}</span>
-                                    </div>
-                                </div>
-                                
+                            {/* ACTION BUTTON */}
+                            <div className="flex justify-end pt-2">
                                 <button 
                                     onClick={() => {
-                                        if(newMsg) {
-                                            addAnnouncement({ 
-                                                id: Date.now().toString(), 
-                                                message: newMsg, 
-                                                type: newType, 
-                                                displayMode: isOverlay ? 'OVERLAY' : 'TICKER', 
+                                        if (newMsg) {
+                                            addAnnouncement({
+                                                id: Date.now().toString(),
+                                                message: newMsg,
+                                                type: newType,
                                                 isActive: true,
-                                                schedule: scheduleStart || scheduleEnd ? {
+                                                displayMode: isOverlay ? 'OVERLAY' : 'TICKER',
+                                                schedule: (scheduleStart || scheduleEnd) ? {
                                                     start: scheduleStart || undefined,
                                                     end: scheduleEnd || undefined
                                                 } : undefined
@@ -822,467 +1507,151 @@ const SettingsPanel: React.FC = () => {
                                             setNewMsg('');
                                             setScheduleStart('');
                                             setScheduleEnd('');
+                                            setIsOverlay(false);
                                         }
-                                    }}
-                                    className="btn-primary px-8 h-12"
+                                    }} 
+                                    disabled={!newMsg}
+                                    className="btn-primary px-8 h-12 shadow-lg shadow-amber-900/20 w-full md:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Adicionar Aviso
+                                    <Megaphone size={18} className="mr-2" /> Publicar Aviso no Painel
                                 </button>
                             </div>
+                         </div>
 
-                            {/* ANIMATED PREVIEW */}
-                            {newMsg && (
-                                <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2">
-                                    <label className="label-pro mb-2 flex items-center gap-2 text-indigo-400"><Eye size={12}/> Pré-visualização em tempo real</label>
-                                    
-                                    {isOverlay ? (
-                                        <div className="w-full aspect-[21/9] bg-black/80 rounded-lg flex items-center justify-center border-4 relative overflow-hidden transition-all duration-300 transform scale-95"
-                                             style={{
-                                                 borderColor: newType === 'CRITICAL' ? '#f43f5e' : newType === 'WARNING' ? '#f59e0b' : newType === 'ATTENTION' ? '#f97316' : '#3b82f6',
-                                                 boxShadow: newType === 'CRITICAL' ? '0 0 20px rgba(244,63,94,0.4)' : 'none'
-                                             }}
-                                        >
-                                            <div className={`text-center space-y-2 ${newType === 'CRITICAL' ? 'animate-pulse' : ''}`}>
-                                                {newType === 'CRITICAL' && <AlertOctagon size={40} className="mx-auto text-rose-500 mb-2" />}
-                                                {newType === 'WARNING' && <AlertTriangle size={40} className="mx-auto text-amber-500 mb-2 animate-bounce" />}
-                                                {newType === 'ATTENTION' && <Megaphone size={40} className="mx-auto text-orange-500 mb-2 animate-wiggle" />}
-                                                <h3 className="text-2xl font-black text-white uppercase tracking-wider">{newMsg}</h3>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="w-full h-12 bg-black rounded-full overflow-hidden flex items-center px-4 relative border border-white/10">
-                                            <div className={`
-                                                flex items-center px-4 py-1 rounded-full whitespace-nowrap
-                                                ${newType === 'ATTENTION' 
-                                                    ? 'bg-gradient-to-r from-orange-600 to-red-600 text-black border-2 border-yellow-400 animate-flash-alert' 
-                                                    : newType === 'CRITICAL' 
-                                                    ? 'bg-rose-950/80 border border-rose-500 animate-critical-attention' 
-                                                    : newType === 'WARNING'
-                                                    ? 'bg-amber-950/80 border border-amber-500 animate-warning-float'
-                                                    : 'bg-blue-950/80 border border-blue-500'
-                                                }
-                                            `}>
-                                                 {newType === 'ATTENTION' && <Megaphone className="mr-2 animate-wiggle" size={16} />}
-                                                 {newType === 'CRITICAL' && <AlertOctagon className="mr-2" size={16} />}
-                                                 {newType === 'WARNING' && <AlertTriangle className="mr-2" size={16} />}
-                                                 <span className={`font-mono font-bold ${newType === 'ATTENTION' ? 'text-black' : 'text-white'}`}>{newMsg}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Active Alerts List */}
-                        <div className="space-y-2">
-                            <label className="label-pro">Avisos Ativos</label>
-                            {announcements.map(alert => (
-                                <div key={alert.id} className="flex items-center justify-between p-4 bg-black/20 rounded-lg border border-white/5 group hover:bg-black/40 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`
-                                            w-10 h-10 rounded-full flex items-center justify-center shrink-0
-                                            ${alert.type === 'INFO' ? 'bg-blue-500/20 text-blue-500' :
-                                              alert.type === 'WARNING' ? 'bg-amber-500/20 text-amber-500' :
-                                              alert.type === 'ATTENTION' ? 'bg-orange-500/20 text-orange-500' :
-                                              'bg-rose-500/20 text-rose-500 animate-pulse'}
-                                        `}>
-                                            {alert.type === 'INFO' ? <Info size={20} /> :
-                                             alert.type === 'WARNING' ? <AlertTriangle size={20} /> :
-                                             alert.type === 'ATTENTION' ? <Megaphone size={20} /> :
-                                             <AlertOctagon size={20} />}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-white text-lg">{alert.message}</p>
-                                            <div className="flex gap-2 mt-1">
-                                                <Badge text={alert.type} />
-                                                <Badge text={alert.displayMode === 'OVERLAY' ? 'TELA CHEIA' : 'RODAPÉ'} color="blue" />
-                                                {alert.schedule && <Badge text="AGENDADO" color="blue" />}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => removeAnnouncement(alert.id)} className="p-3 text-brewery-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors">
-                                        <Trash2 size={20} />
-                                    </button>
-                                </div>
-                            ))}
+                         {/* LIST OF ALERTS */}
+                         <div className="space-y-4 pt-4">
+                            <h3 className="text-xs font-bold text-brewery-muted uppercase tracking-widest flex items-center gap-2"><List size={14}/> Avisos Ativos ({announcements.length})</h3>
+                            
                             {announcements.length === 0 && (
-                                <div className="text-center py-10 text-brewery-muted opacity-50 border-2 border-dashed border-brewery-border rounded-lg">
-                                    <Bell size={40} className="mx-auto mb-2" />
-                                    <p>Nenhum aviso ativo no momento.</p>
+                                <div className="flex flex-col items-center justify-center py-12 bg-black/20 rounded-xl border border-dashed border-brewery-border text-brewery-muted">
+                                    <Bell size={40} className="mb-3 opacity-20" />
+                                    <p>Nenhum aviso configurado no momento.</p>
                                 </div>
                             )}
-                        </div>
-                    </div>
-                )}
 
-                {/* --- TAB: PARTY MODE (OPTIMIZED) --- */}
-                {activeTab === 'PARTY' && (
-                     <div className="space-y-6 max-w-4xl mx-auto">
-                        <SectionHeader title="Modo Festa & Eventos" desc="Transforme o painel para Happy Hours e celebrações." />
-                        
-                        {/* Main Toggle Card */}
-                        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900 to-purple-900 border border-purple-500/30 rounded-xl p-8 shadow-2xl transition-all duration-300">
-                            {/* Decorative Background Elements */}
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-                            <div className="absolute bottom-0 left-0 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
-
-                            <div className="relative z-10 flex justify-between items-center mb-8">
-                                <div>
-                                    <h3 className="font-bold text-white text-2xl flex items-center gap-3 drop-shadow-md">
-                                        <PartyPopper className="text-purple-300" size={32} /> 
-                                        Modo Festa
-                                    </h3>
-                                    <p className="text-purple-200/70 mt-1">Ative efeitos visuais, altere cores e exiba animações.</p>
-                                </div>
-                                <Toggle checked={layout.isPartyMode} onChange={() => updateLayout({ isPartyMode: !layout.isPartyMode })} color="purple" />
-                            </div>
-                            
-                            <div className={`space-y-8 transition-all duration-500 ${layout.isPartyMode ? 'opacity-100 translate-y-0' : 'opacity-50 blur-[2px] pointer-events-none grayscale'}`}>
-                                
-                                {/* 1. Message */}
-                                <div className="bg-black/20 p-4 rounded-lg border border-purple-500/20">
-                                    <label className="text-purple-200 text-xs font-bold uppercase tracking-widest mb-2 block">Mensagem do Cabeçalho</label>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            className="flex-1 bg-black/30 border border-purple-400/30 rounded-lg px-4 py-3 text-white placeholder-purple-300/30 focus:outline-none focus:border-purple-400 transition"
-                                            value={layout.partyMessage || ''} 
-                                            onChange={(e) => updateLayout({ partyMessage: e.target.value })}
-                                            placeholder="Ex: HAPPY HOUR DA CERVEJARIA!"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* 2. Effect Grid */}
-                                <div>
-                                    <label className="text-purple-200 text-xs font-bold uppercase tracking-widest mb-4 block">Efeito Visual de Fundo</label>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar p-1">
-                                        
-                                        {/* Special Custom Card */}
-                                        <div 
-                                            onClick={() => updateLayout({ partyEffect: 'CUSTOM' })}
-                                            className={`col-span-1 md:col-span-2 cursor-pointer rounded-lg border p-4 flex flex-row items-center gap-4 transition-all group relative overflow-hidden ${layout.partyEffect === 'CUSTOM' ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/40 ring-2 ring-purple-300' : 'bg-black/40 border-purple-500/20 text-purple-300 hover:bg-purple-900/20'}`}
-                                        >
-                                            <div className={`p-3 rounded-full transition-colors shrink-0 ${layout.partyEffect === 'CUSTOM' ? 'bg-white/20' : 'bg-black/20 group-hover:bg-purple-600/20'}`}>
-                                                <ImageIcon size={28} />
+                            <div className="grid gap-3">
+                                {announcements.map(item => (
+                                    <div key={item.id} className="bg-brewery-card border border-brewery-border p-4 rounded-xl flex items-center justify-between group hover:border-brewery-accent/40 transition-all shadow-sm">
+                                        <div className="flex items-center gap-5 overflow-hidden">
+                                            {/* Type Icon Indicator */}
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 border-2 ${
+                                                item.type === 'CRITICAL' ? 'bg-rose-900/30 border-rose-500 text-rose-500' : 
+                                                item.type === 'WARNING' ? 'bg-amber-900/30 border-amber-500 text-amber-500' : 
+                                                item.type === 'ATTENTION' ? 'bg-orange-900/30 border-orange-500 text-orange-500' : 
+                                                'bg-blue-900/30 border-blue-500 text-blue-400'
+                                            }`}>
+                                                {item.type === 'CRITICAL' ? <AlertOctagon size={20} /> : 
+                                                 item.type === 'WARNING' ? <AlertTriangle size={20} /> :
+                                                 item.type === 'ATTENTION' ? <Megaphone size={20} /> : <Info size={20} />}
                                             </div>
-                                            <div className="z-10">
-                                                <span className="text-sm font-bold block">Personalizado</span>
-                                                <span className={`text-[10px] ${layout.partyEffect === 'CUSTOM' ? 'text-purple-100' : 'text-purple-400/60'}`}>Use sua própria imagem ou logo caindo na tela</span>
-                                            </div>
-                                        </div>
 
-                                        <EffectCard active={layout.partyEffect === 'BUBBLES'} onClick={() => updateLayout({ partyEffect: 'BUBBLES' })} icon={<Wind size={24} />} label="Bolhas" description="Estilo Cerveja" />
-                                        <EffectCard active={layout.partyEffect === 'CONFETTI'} onClick={() => updateLayout({ partyEffect: 'CONFETTI' })} icon={<PartyPopper size={24} />} label="Confetes" description="Celebração" />
-                                        <EffectCard active={layout.partyEffect === 'WORLDCUP'} onClick={() => updateLayout({ partyEffect: 'WORLDCUP' })} icon={<Flag size={24} />} label="Copa" description="Verde e Amarelo" />
-                                        <EffectCard active={layout.partyEffect === 'OLYMPICS'} onClick={() => updateLayout({ partyEffect: 'OLYMPICS' })} icon={<Medal size={24} />} label="Olimpíadas" description="Cores Olímpicas" />
-                                        <EffectCard active={layout.partyEffect === 'BIRTHDAY'} onClick={() => updateLayout({ partyEffect: 'BIRTHDAY' })} icon={<Cake size={24} />} label="Aniversário" description="Balões" />
-                                        <EffectCard active={layout.partyEffect === 'BONUS'} onClick={() => updateLayout({ partyEffect: 'BONUS' })} icon={<Banknote size={24} />} label="Bônus" description="Chuva de $$$" />
-                                        <EffectCard active={layout.partyEffect === 'GOAL'} onClick={() => updateLayout({ partyEffect: 'GOAL' })} icon={<Trophy size={24} />} label="Meta Batida" description="Troféus e Ouro" />
-                                        <EffectCard active={layout.partyEffect === 'DISCO'} onClick={() => updateLayout({ partyEffect: 'DISCO' })} icon={<Disc size={24} />} label="Disco" description="Luzes Strobe" />
-                                        <EffectCard active={layout.partyEffect === 'GLOW'} onClick={() => updateLayout({ partyEffect: 'GLOW' })} icon={<Sparkles size={24} />} label="Glow" description="Ambiente Suave" />
-                                    </div>
-                                </div>
-
-                                {/* Custom Image Uploader for Party Mode (Only if CUSTOM selected) */}
-                                {layout.partyEffect === 'CUSTOM' && (
-                                    <div className="bg-purple-950/40 border border-purple-500/30 rounded-lg p-6 animate-in slide-in-from-top duration-300">
-                                        <div className="flex flex-col md:flex-row gap-6 items-center">
-                                            <div className="w-24 h-24 bg-black/50 rounded-lg border border-purple-500/30 flex items-center justify-center overflow-hidden shrink-0 relative shadow-lg">
-                                                {/* Checkerboard pattern for transparency */}
-                                                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%)', backgroundSize: '10px 10px', backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px' }} />
-                                                
-                                                {layout.customPartyImage ? (
-                                                    <img src={layout.customPartyImage} className="w-full h-full object-contain relative z-10" />
-                                                ) : (
-                                                    <ImageIcon className="text-purple-400 opacity-50 relative z-10" />
-                                                )}
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="text-sm font-bold text-white mb-2">Imagem da Partícula</h4>
-                                                <p className="text-xs text-purple-300 mb-4 leading-relaxed">
-                                                    Envie um logo, rosto ou ícone (PNG/JPG). Esta imagem cairá repetidamente na tela.<br/>
-                                                    Use a ferramenta de "Recortar Fundo" se sua imagem tiver fundo branco/sólido.
-                                                </p>
-                                                <div className="flex gap-3">
-                                                    <label className={`btn-primary bg-zinc-800 hover:bg-zinc-700 cursor-pointer text-xs py-2 px-4 border border-white/10 ${isProcessingBg ? 'opacity-50 pointer-events-none' : ''}`}>
-                                                        {isProcessingBg ? <RefreshCw className="animate-spin mr-2" size={14}/> : <Upload size={14} className="mr-2" />}
-                                                        Upload Original
-                                                        <input 
-                                                            type="file" 
-                                                            className="hidden" 
-                                                            accept="image/png, image/jpeg, image/gif" 
-                                                            onChange={(e) => e.target.files?.[0] && processImage(e.target.files[0], false, 'PARTY')} 
-                                                        />
-                                                    </label>
-                                                    <label className={`btn-primary bg-purple-600 hover:bg-purple-500 cursor-pointer text-xs py-2 px-4 shadow-lg shadow-purple-900/50 ${isProcessingBg ? 'opacity-50 pointer-events-none' : ''}`}>
-                                                        {isProcessingBg ? <RefreshCw className="animate-spin mr-2" size={14}/> : <Scissors size={14} className="mr-2" />}
-                                                        Upload & Recortar Fundo
-                                                        <input 
-                                                            type="file" 
-                                                            className="hidden" 
-                                                            accept="image/png, image/jpeg" 
-                                                            onChange={(e) => e.target.files?.[0] && processImage(e.target.files[0], true, 'PARTY')} 
-                                                        />
-                                                    </label>
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-white text-lg leading-tight truncate">{item.message}</p>
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    <Badge text={item.type} color={
+                                                        item.type === 'CRITICAL' ? 'rose' : 
+                                                        item.type === 'WARNING' ? 'amber' : 
+                                                        item.type === 'ATTENTION' ? 'orange' : 'blue'
+                                                    }/>
+                                                    <Badge text={item.displayMode === 'OVERLAY' ? 'TELA CHEIA' : 'RODAPÉ'} />
+                                                    
+                                                    {(item.schedule?.start || item.schedule?.end) && (
+                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-black/40 text-brewery-muted border border-white/10 font-mono">
+                                                            <Clock size={10} />
+                                                            {item.schedule.start ? new Date(item.schedule.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Agora'}
+                                                            {' -> '}
+                                                            {item.schedule.end ? new Date(item.schedule.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Indefinido'}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <button 
+                                            onClick={() => removeAnnouncement(item.id)}
+                                            className="p-3 bg-black/40 hover:bg-rose-950 text-brewery-muted hover:text-rose-500 rounded-lg transition-colors border border-white/5 hover:border-rose-500/30"
+                                            title="Remover Aviso"
+                                        >
+                                            <Trash2 size={20} />
+                                        </button>
                                     </div>
-                                )}
+                                ))}
                             </div>
-                        </div>
+                         </div>
                     </div>
                 )}
                 
-                {/* --- TAB: LAYOUT, HEADER, API (Remaining tabs logic reused) --- */}
-                {activeTab === 'HEADER' && (
-                     <div className="space-y-6 max-w-3xl mx-auto">
-                        <SectionHeader title="Cabeçalho & Marca" desc="Personalize o título, cores e banner superior da aplicação." />
-
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 space-y-6">
-                            
-                            {/* Alignment & Logo */}
-                            <div className="flex flex-col md:flex-row gap-6 items-start">
-                                <div className="flex-1 w-full">
-                                    <label className="label-pro mb-3">Alinhamento do Título</label>
-                                    <div className="flex bg-black/40 rounded-lg p-1 border border-brewery-border">
-                                        <button 
-                                            onClick={() => updateLayout({ header: { ...layout.header, alignment: 'LEFT' } })} 
-                                            className={`flex-1 py-2 text-xs font-bold rounded flex justify-center items-center gap-2 transition ${layout.header.alignment === 'LEFT' ? 'bg-brewery-accent text-black shadow' : 'text-brewery-muted hover:text-white'}`}
-                                        >
-                                            <AlignLeft size={16} /> Esquerda
-                                        </button>
-                                        <button 
-                                            onClick={() => updateLayout({ header: { ...layout.header, alignment: 'CENTER' } })} 
-                                            className={`flex-1 py-2 text-xs font-bold rounded flex justify-center items-center gap-2 transition ${layout.header.alignment === 'CENTER' ? 'bg-brewery-accent text-black shadow' : 'text-brewery-muted hover:text-white'}`}
-                                        >
-                                            <AlignCenter size={16} /> Centralizado
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                {/* CUSTOM LOGO UPLOADER WITH CUTOUT */}
-                                <div className="flex-1 w-full">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <label className="label-pro mb-0">Logo Personalizado</label>
-                                        <Toggle checked={layout.logoWidget?.show} onChange={() => updateLayout({ logoWidget: { ...layout.logoWidget, show: !layout.logoWidget.show } })} />
-                                    </div>
-                                    
-                                    <div className="bg-black/30 border border-white/10 rounded-lg p-4">
-                                        <div className="flex gap-4">
-                                            <div className="w-20 h-20 bg-black/50 rounded border border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">
-                                                {/* Checkerboard for transparency check */}
-                                                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%)', backgroundSize: '10px 10px', backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px' }} />
-                                                
-                                                {layout.logoWidget?.url ? (
-                                                    <img src={layout.logoWidget.url} className="w-full h-full object-contain relative z-10" />
-                                                ) : (
-                                                    <ImageIcon className="text-brewery-muted opacity-30 relative z-10" />
-                                                )}
-                                            </div>
-                                            <div className="flex-1 flex flex-col justify-center gap-2">
-                                                <p className="text-[10px] text-brewery-muted mb-1">
-                                                    Max 5MB. A logo ficará flutuante na tela e pode ser redimensionada.
-                                                </p>
-                                                <div className="flex gap-2">
-                                                    <label className={`btn-primary flex-1 cursor-pointer text-[10px] py-1.5 px-2 ${isProcessingBg ? 'opacity-50 pointer-events-none' : ''}`}>
-                                                        {isProcessingBg ? <RefreshCw className="animate-spin mr-1" size={12}/> : <Upload size={12} className="mr-1" />}
-                                                        Original
-                                                        <input 
-                                                            type="file" 
-                                                            className="hidden" 
-                                                            accept="image/*" 
-                                                            onChange={(e) => e.target.files?.[0] && processImage(e.target.files[0], false, 'LOGO')} 
-                                                        />
-                                                    </label>
-                                                    <label className={`btn-primary bg-indigo-600 hover:bg-indigo-500 flex-1 cursor-pointer text-[10px] py-1.5 px-2 ${isProcessingBg ? 'opacity-50 pointer-events-none' : ''}`}>
-                                                        {isProcessingBg ? <RefreshCw className="animate-spin mr-1" size={12}/> : <Scissors size={12} className="mr-1" />}
-                                                        Recortar Fundo
-                                                        <input 
-                                                            type="file" 
-                                                            className="hidden" 
-                                                            accept="image/*" 
-                                                            onChange={(e) => e.target.files?.[0] && processImage(e.target.files[0], true, 'LOGO')} 
-                                                        />
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="border-t border-brewery-border"></div>
-
-                            {/* Title & Subtitle */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label-pro">Título Principal</label>
-                                    <input 
-                                        className="input-pro font-bold"
-                                        value={layout.header.title}
-                                        onChange={(e) => updateLayout({ header: { ...layout.header, title: e.target.value } })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="label-pro">Subtítulo (Opcional)</label>
-                                    <input 
-                                        className="input-pro"
-                                        value={layout.header.subtitle}
-                                        onChange={(e) => updateLayout({ header: { ...layout.header, subtitle: e.target.value } })}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Colors */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label-pro">Cor do Texto</label>
-                                    <div className="flex gap-2 items-center">
-                                        <input 
-                                            type="color" 
-                                            className="w-10 h-10 rounded cursor-pointer border-none bg-transparent"
-                                            value={layout.header.textColor}
-                                            onChange={(e) => updateLayout({ header: { ...layout.header, textColor: e.target.value } })}
-                                        />
-                                        <input 
-                                            className="input-pro font-mono uppercase"
-                                            value={layout.header.textColor}
-                                            onChange={(e) => updateLayout({ header: { ...layout.header, textColor: e.target.value } })}
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="label-pro">Cor do Fundo</label>
-                                    <div className="flex gap-2 items-center">
-                                        <input 
-                                            type="color" 
-                                            className="w-10 h-10 rounded cursor-pointer border-none bg-transparent"
-                                            value={layout.header.backgroundColor}
-                                            onChange={(e) => updateLayout({ header: { ...layout.header, backgroundColor: e.target.value } })}
-                                        />
-                                        <input 
-                                            className="input-pro font-mono uppercase"
-                                            value={layout.header.backgroundColor}
-                                            onChange={(e) => updateLayout({ header: { ...layout.header, backgroundColor: e.target.value } })}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="border-t border-brewery-border my-6"></div>
-
-                            {/* Top Media Banner */}
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h3 className="font-bold text-brewery-text flex items-center gap-2"><Monitor size={18}/> Banner de Mídia Superior</h3>
-                                    <p className="text-xs text-brewery-muted mt-1">Exibe uma tela de mídia de largura total no topo (abaixo do cabeçalho).</p>
-                                </div>
-                                <Toggle checked={layout.header.showTopMedia} onChange={() => updateLayout({ header: { ...layout.header, showTopMedia: !layout.header.showTopMedia } })} />
-                            </div>
-                        </div>
-                     </div>
-                )}
-                
+                {/* --- TAB: LAYOUT & INTERFACE (Optimized) --- */}
                 {activeTab === 'LAYOUT' && (
                     <div className="space-y-8 max-w-3xl mx-auto">
-                        <SectionHeader title="Layout & Interface" desc="Personalize a disposição dos painéis e elementos visuais." />
-
-                        {/* 1. Window Management */}
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 relative overflow-hidden">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <h3 className="font-bold text-brewery-text flex items-center gap-2"><LayoutTemplate size={18}/> Elementos da Tela</h3>
-                                    <p className="text-xs text-brewery-muted mt-1">Controle o que é exibido no dashboard principal.</p>
+                         <SectionHeader title="Layout & Interface" desc="Personalize a disposição dos painéis e elementos visuais." />
+                         <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 space-y-4">
+                            <div className="flex justify-between items-center p-3 bg-black/20 rounded border border-white/5">
+                                <div className="flex items-center gap-3">
+                                    <Monitor size={18} className="text-indigo-400" />
+                                    <div>
+                                        <span className="text-sm font-bold text-white block">Painel de Mídia (PIP)</span>
+                                        <span className="text-xs text-brewery-muted">Ativar/Desativar todas as janelas flutuantes globalmente.</span>
+                                    </div>
                                 </div>
-                                <button 
-                                    onClick={resetLayoutPositions}
-                                    className="text-xs text-brewery-muted flex items-center gap-1 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded transition"
-                                >
-                                    <RotateCcw size={12} /> Resetar Posições
-                                </button>
+                                <Toggle checked={layout.showMediaPanel} onChange={() => updateLayout({ showMediaPanel: !layout.showMediaPanel })} />
                             </div>
-
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center p-3 bg-black/20 rounded border border-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <Monitor size={18} className="text-indigo-400" />
-                                        <div>
-                                            <span className="text-sm font-bold text-white block">Janela de Mídia Flutuante</span>
-                                            <span className="text-xs text-brewery-muted">Player PIP (Picture-in-Picture) arrastável</span>
-                                        </div>
-                                    </div>
-                                    <Toggle checked={layout.showMediaPanel} onChange={() => updateLayout({ showMediaPanel: !layout.showMediaPanel })} />
-                                </div>
-                                
-                                <div className="p-3 bg-black/20 rounded border border-white/5 space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-indigo-400"><MousePointer2 size={18} /></div>
-                                            <div>
-                                                <span className="text-sm font-bold text-white block">Configuração da Janela de Mídia</span>
-                                                <span className="text-xs text-brewery-muted">Ajuste manual de posição e tamanho</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-4 gap-2 text-xs">
-                                        <div>
-                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Largura</label>
-                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.w} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, w: Number(e.target.value) } })} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Altura</label>
-                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.h} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, h: Number(e.target.value) } })} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Pos X</label>
-                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.x} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, x: Number(e.target.value) } })} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] uppercase text-brewery-muted mb-1">Pos Y</label>
-                                            <input className="input-pro py-1 px-2" type="number" value={layout.mediaWindow.y} onChange={(e) => updateLayout({ mediaWindow: { ...layout.mediaWindow, y: Number(e.target.value) } })} />
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex justify-between items-center p-3 bg-black/20 rounded border border-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <Megaphone size={18} className="text-orange-400" />
-                                        <div>
-                                            <span className="text-sm font-bold text-white block">Ticker de Notícias</span>
-                                            <span className="text-xs text-brewery-muted">Barra de rolagem inferior</span>
-                                        </div>
-                                    </div>
-                                    <Toggle checked={layout.showTicker} onChange={() => updateLayout({ showTicker: !layout.showTicker })} />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. Behavior Settings */}
-                        <div className="bg-brewery-card border border-brewery-border rounded-lg p-6">
-                            <h3 className="font-bold text-brewery-text mb-4 flex items-center gap-2"><Gauge size={18}/> Comportamento</h3>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label-pro mb-2">Ajuste de Mídia</label>
-                                    <div className="flex bg-black rounded p-1 border border-brewery-border">
-                                        <button 
-                                            onClick={() => updateLayout({ mediaFit: 'COVER' })} 
-                                            className={`flex-1 py-2 text-xs font-bold rounded flex justify-center items-center gap-2 transition ${layout.mediaFit === 'COVER' ? 'bg-brewery-accent text-black' : 'text-brewery-muted hover:text-white'}`}
-                                        >
-                                            <Crop size={14} /> Preencher
-                                        </button>
-                                        <button 
-                                            onClick={() => updateLayout({ mediaFit: 'CONTAIN' })} 
-                                            className={`flex-1 py-2 text-xs font-bold rounded flex justify-center items-center gap-2 transition ${layout.mediaFit === 'CONTAIN' ? 'bg-brewery-accent text-black' : 'text-brewery-muted hover:text-white'}`}
-                                        >
-                                            <Expand size={14} /> Ajustar
-                                        </button>
+                            <div className="flex justify-between items-center p-3 bg-black/20 rounded border border-white/5">
+                                <div className="flex items-center gap-3">
+                                    <Rss size={18} className="text-orange-400" />
+                                    <div>
+                                        <span className="text-sm font-bold text-white block">Ticker de Notícias (Rodapé)</span>
+                                        <span className="text-xs text-brewery-muted">Exibir barra de rolagem de avisos na parte inferior.</span>
                                     </div>
                                 </div>
+                                <Toggle checked={layout.showTicker} onChange={() => updateLayout({ showTicker: !layout.showTicker })} />
                             </div>
-                        </div>
+
+                            {layout.showTicker && (
+                                <div className="px-3 space-y-4 pt-2">
+                                    <div>
+                                        <label className="label-pro flex justify-between">
+                                            <span>Velocidade do Ticker</span>
+                                            <span className="text-indigo-400">{layout.tickerSpeed}s</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="10" max="100" step="5" 
+                                            className="w-full accent-indigo-500"
+                                            value={layout.tickerSpeed}
+                                            onChange={(e) => updateLayout({ tickerSpeed: parseInt(e.target.value) })}
+                                        />
+                                        <p className="text-[10px] text-zinc-500 mt-1">Quanto menor o valor, mais rápido o texto passa.</p>
+                                    </div>
+                                    <div>
+                                        <label className="label-pro flex justify-between">
+                                            <span>Altura da Barra (px)</span>
+                                            <span className="text-indigo-400">{layout.tickerHeight || 60}px</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="30" max="150" step="5" 
+                                            className="w-full accent-indigo-500"
+                                            value={layout.tickerHeight || 60}
+                                            onChange={(e) => updateLayout({ tickerHeight: parseInt(e.target.value) })}
+                                        />
+                                    </div>
+                                    {/* NEW: Font Size Control */}
+                                    <div>
+                                        <label className="label-pro flex justify-between">
+                                            <span>Tamanho da Fonte (px)</span>
+                                            <span className="text-indigo-400">{layout.tickerFontSize || 18}px</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="12" max="72" step="2" 
+                                            className="w-full accent-indigo-500"
+                                            value={layout.tickerFontSize || 18}
+                                            onChange={(e) => updateLayout({ tickerFontSize: parseInt(e.target.value) })}
+                                        />
+                                        <p className="text-[10px] text-zinc-500 mt-1">Aumente ou diminua o texto das mensagens.</p>
+                                    </div>
+                                </div>
+                            )}
+                         </div>
                     </div>
                 )}
             </div>
@@ -1338,36 +1707,6 @@ const SettingsPanel: React.FC = () => {
         .btn-ghost:hover {
             color: #fffbeb;
             background-color: #291d18;
-        }
-        /* Custom Animations for Alert Preview */
-        .animate-critical-attention {
-          animation: critical-attention 2s infinite ease-in-out;
-        }
-        .animate-warning-float {
-          animation: warning-float 3s infinite ease-in-out;
-        }
-        .animate-flash-alert {
-          animation: flash-alert 1s infinite linear;
-        }
-        .animate-wiggle {
-          animation: wiggle 0.5s infinite ease-in-out;
-        }
-        @keyframes critical-attention {
-          0%, 100% { transform: scale(1); background-color: rgba(76, 5, 25, 0.6); border-color: rgba(244, 63, 94, 0.5); }
-          50% { transform: scale(1.05); background-color: rgba(136, 19, 55, 0.6); border-color: #fff; }
-        }
-        @keyframes warning-float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-3px); }
-        }
-        @keyframes flash-alert {
-          0%, 100% { opacity: 1; border-color: #fbbf24; }
-          50% { opacity: 0.9; border-color: #fff; }
-        }
-        @keyframes wiggle {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(-10deg); }
-          75% { transform: rotate(10deg); }
         }
       `}</style>
     </div>

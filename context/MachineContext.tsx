@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useReducer, useState } from 'react';
-import { AppState, AppContextType, MachineData, MediaItem, Announcement, LayoutSettings, LineConfig, ConnectionSettings } from '../types';
+import { AppState, AppContextType, MachineData, MediaItem, Announcement, LayoutSettings, LineConfig, ConnectionSettings, FloatingWindowConfig } from '../types';
 import { nodeRedService } from '../services/nodeRedService'; // USANDO SERVIÇO REAL
 import { APP_CONFIG, LINE_CONFIGS as INITIAL_LINES } from '../constants';
 
@@ -17,6 +17,8 @@ const BANNER_MEDIA: MediaItem[] = [
 // NOTE: In Electron (file://), we allow insecure connections for local network devices
 const isSecure = typeof window !== 'undefined' && 
                  window.location.protocol === 'https:';
+
+const STORAGE_KEY = 'IV_PRO_CONFIG_V1';
 
 const initialState: AppState = {
   lineConfigs: INITIAL_LINES, 
@@ -42,6 +44,7 @@ const initialState: AppState = {
         backgroundColor: '#1a110d',
         showTopMedia: false,
         topMediaHeight: 200,
+        topMediaBorderWidth: 1, // Default border width
         alignment: 'LEFT'
     },
     // New draggable logo widget defaults
@@ -53,10 +56,15 @@ const initialState: AppState = {
         h: 120,
         url: '' // Empty by default
     },
-    mediaWindow: { x: 800, y: 350, w: 400, h: 300 }, // Default position
+    // UPDATED: Floating Windows Array (default has one)
+    floatingWindows: [
+        { id: 'floating', name: 'Principal', x: 800, y: 350, w: 400, h: 300 }
+    ],
     widgetSize: 'NORMAL',
     showMediaPanel: true,
     showTicker: true,
+    tickerHeight: 60, // Default height
+    tickerFontSize: 18, // NEW: Default font size
     mediaFit: 'COVER',
     tickerSpeed: 30,
     isPartyMode: false,
@@ -71,6 +79,66 @@ const initialState: AppState = {
     path: '/ws/brewery-data',
     autoConnect: true
   }
+};
+
+// --- PERSISTENCE HELPER FUNCTIONS ---
+
+/**
+ * Loads state from localStorage and merges with default initialState.
+ * Handles migration/schema changes gracefully by using spread syntax.
+ */
+const loadState = (defaultState: AppState): AppState => {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return defaultState;
+
+        const parsed = JSON.parse(stored);
+
+        // MIGRATION LOGIC: Check if layout has 'mediaWindow' (old) instead of 'floatingWindows' (new)
+        if (parsed.layout && parsed.layout.mediaWindow && !parsed.layout.floatingWindows) {
+            console.log("Migrating single mediaWindow to floatingWindows array...");
+            parsed.layout.floatingWindows = [{
+                id: 'floating',
+                name: 'Principal',
+                x: parsed.layout.mediaWindow.x,
+                y: parsed.layout.mediaWindow.y,
+                w: parsed.layout.mediaWindow.w,
+                h: parsed.layout.mediaWindow.h
+            }];
+            delete parsed.layout.mediaWindow;
+        }
+
+        // Merge strategies:
+        return {
+            ...defaultState,
+            ...parsed,
+            machines: {},
+            connectionStatus: 'DISCONNECTED',
+            globalError: null,
+            lastHeartbeat: 0,
+            showSettings: false,
+            layout: { ...defaultState.layout, ...parsed.layout }, 
+            connectionConfig: { ...defaultState.connectionConfig, ...parsed.connectionConfig }
+        };
+    } catch (error) {
+        console.error("Failed to load persistence state, using defaults:", error);
+        return defaultState;
+    }
+};
+
+/**
+ * Sanitizes the state before saving to prevent storage bloat and
+ * remove volatile real-time data.
+ */
+const sanitizeStateForStorage = (state: AppState) => {
+    return {
+        lineConfigs: state.lineConfigs,
+        playlists: state.playlists,
+        // Limit announcements history to last 50 to prevent infinite growth
+        announcements: state.announcements.slice(-50), 
+        layout: state.layout,
+        connectionConfig: state.connectionConfig
+    };
 };
 
 // Actions
@@ -90,7 +158,11 @@ type Action =
   | { type: 'ADD_LINE'; payload: LineConfig }
   | { type: 'UPDATE_LINE'; payload: { id: string; config: Partial<LineConfig> } }
   | { type: 'REMOVE_LINE'; payload: string }
-  | { type: 'REORDER_LINES'; payload: { startIndex: number; endIndex: number } };
+  | { type: 'REORDER_LINES'; payload: { startIndex: number; endIndex: number } }
+  // Window Actions
+  | { type: 'ADD_WINDOW'; payload: { name: string } }
+  | { type: 'REMOVE_WINDOW'; payload: string }
+  | { type: 'UPDATE_WINDOW'; payload: { id: string; config: Partial<FloatingWindowConfig> } };
 
 // Helper: Normalize Raw Data using Mapping Config
 const normalizeData = (rawData: any, config: LineConfig, currentMachineState?: MachineData): MachineData | null => {
@@ -100,7 +172,6 @@ const normalizeData = (rawData: any, config: LineConfig, currentMachineState?: M
     const values = rawData.payload || rawData; 
 
     // Extract values based on user configuration keys
-    // Fallback to defaults or raw keys if mapping is missing
     const temperature = Number(values[mapping.temperatureKey]) || 0;
     
     // Manage Trend History
@@ -162,7 +233,6 @@ function machineReducer(state: AppState, action: Action): AppState {
     case 'SET_ERROR':
       return { ...state, globalError: action.payload };
     
-    // UPDATED MEDIA REDUCERS
     case 'ADD_MEDIA': {
       const { key, item } = action.payload;
       const currentList = state.playlists[key] || [];
@@ -210,20 +280,16 @@ function machineReducer(state: AppState, action: Action): AppState {
       return { ...state, showSettings: !state.showSettings };
     case 'UPDATE_LAYOUT':
       let newLayout = { ...state.layout, ...action.payload };
-      
-      // Handle Nested Updates
       if (action.payload.header) {
           newLayout.header = { ...state.layout.header, ...action.payload.header };
       }
       if (action.payload.logoWidget) {
           newLayout.logoWidget = { ...state.layout.logoWidget, ...action.payload.logoWidget };
       }
-
       return { ...state, layout: newLayout };
     case 'UPDATE_CONNECTION_CONFIG':
       return { ...state, connectionConfig: { ...state.connectionConfig, ...action.payload } };
     
-    // Line Management Reducers
     case 'ADD_LINE':
       return { ...state, lineConfigs: [...state.lineConfigs, action.payload] };
     case 'REMOVE_LINE':
@@ -242,6 +308,46 @@ function machineReducer(state: AppState, action: Action): AppState {
       return { ...state, lineConfigs: result };
     }
 
+    // WINDOW MANAGEMENT REDUCERS
+    case 'ADD_WINDOW': {
+        const newId = `window-${Date.now()}`;
+        const newWindow: FloatingWindowConfig = {
+            id: newId,
+            name: action.payload.name,
+            x: 100 + (state.layout.floatingWindows.length * 20), // Cascade position
+            y: 100 + (state.layout.floatingWindows.length * 20),
+            w: 400,
+            h: 300
+        };
+        // Also initialize playlist for this window
+        return {
+            ...state,
+            layout: { ...state.layout, floatingWindows: [...state.layout.floatingWindows, newWindow] },
+            playlists: { ...state.playlists, [newId]: [] }
+        };
+    }
+    case 'REMOVE_WINDOW': {
+        return {
+            ...state,
+            layout: { 
+                ...state.layout, 
+                floatingWindows: state.layout.floatingWindows.filter(w => w.id !== action.payload) 
+            }
+            // Optional: Cleanup playlist, but keeping it is safer for undo
+        };
+    }
+    case 'UPDATE_WINDOW': {
+        return {
+            ...state,
+            layout: {
+                ...state.layout,
+                floatingWindows: state.layout.floatingWindows.map(w => 
+                    w.id === action.payload.id ? { ...w, ...action.payload.config } : w
+                )
+            }
+        };
+    }
+
     default:
       return state;
   }
@@ -250,22 +356,27 @@ function machineReducer(state: AppState, action: Action): AppState {
 const MachineContext = createContext<AppContextType | undefined>(undefined);
 
 export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(machineReducer, initialState);
+  // Use Lazy Initialization for State to load from LocalStorage
+  const [state, dispatch] = useReducer(machineReducer, initialState, loadState);
   const [isStale, setIsStale] = useState(false);
 
-  // 1. Connection Logic (REAL NODE-RED SERVICE)
+  // 1. AUTO-SAVE & PERSISTENCE EFFECT
+  useEffect(() => {
+    const dataToSave = sanitizeStateForStorage(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+  }, [
+    state.lineConfigs,
+    state.playlists,
+    state.announcements,
+    state.layout,
+    state.connectionConfig
+  ]);
+
+  // 2. Connection Logic (REAL NODE-RED SERVICE)
   useEffect(() => {
     let wsUrl = APP_CONFIG.WS_URL;
     if (state.connectionConfig.host) {
-        // Ensure protocol matches current page security, BUT
-        // If we are in Electron (file://), we allow 'ws' even if we consider ourselves "secure" locally.
         const protocol = state.connectionConfig.protocol;
-        
-        // Removed the forceful upgrade logic for Electron compatibility.
-        // The check 'window.location.protocol === https:' handles standard web deployments.
-        // In Electron, protocol is 'file:', so it will correctly default to 'ws' if configured,
-        // without forcing 'wss' which breaks local PLC connections.
-
         const host = state.connectionConfig.host;
         const port = state.connectionConfig.port;
         const path = state.connectionConfig.path;
@@ -282,7 +393,7 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return cleanup;
   }, [state.connectionConfig]);
 
-  // 2. Watchdog Logic (Data Freshness)
+  // 3. Watchdog Logic
   useEffect(() => {
     const timer = setInterval(() => {
       const timeSinceLastHeartbeat = Date.now() - state.lastHeartbeat;
@@ -292,7 +403,6 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => clearInterval(timer);
   }, [state.lastHeartbeat]);
 
-  // Updated dispatchers with playlistKey
   const addMedia = (playlistKey: string, item: MediaItem) => dispatch({ type: 'ADD_MEDIA', payload: { key: playlistKey, item } });
   const removeMedia = (playlistKey: string, id: string) => dispatch({ type: 'REMOVE_MEDIA', payload: { key: playlistKey, id } });
   const updateMedia = (playlistKey: string, id: string, data: Partial<MediaItem>) => dispatch({ type: 'UPDATE_MEDIA', payload: { key: playlistKey, id, data } });
@@ -310,6 +420,11 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const removeLine = (id: string) => dispatch({ type: 'REMOVE_LINE', payload: id });
   const reorderLines = (startIndex: number, endIndex: number) => dispatch({ type: 'REORDER_LINES', payload: { startIndex, endIndex } });
   
+  // Window Actions
+  const addWindow = (name: string) => dispatch({ type: 'ADD_WINDOW', payload: { name } });
+  const removeWindow = (id: string) => dispatch({ type: 'REMOVE_WINDOW', payload: id });
+  const updateWindow = (id: string, config: Partial<FloatingWindowConfig>) => dispatch({ type: 'UPDATE_WINDOW', payload: { id, config } });
+
   const clearError = () => dispatch({ type: 'SET_ERROR', payload: null });
 
   const value: AppContextType = {
@@ -329,6 +444,9 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     removeLine,
     reorderLines,
     updateLineConfig: (id, target) => console.log('Legacy update called', id, target),
+    addWindow,
+    removeWindow,
+    updateWindow,
     clearError
   };
 
