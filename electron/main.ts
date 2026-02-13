@@ -1,68 +1,82 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, globalShortcut } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import process from 'node:process'
 
+// BYTENODE SECURITY:
+// Ensure Bytenode is initialized if we are loading compiled code.
+// require('bytenode'); 
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-// The built directory structure
-//
-// ├─┬─ dist
-// │ ├─ index.html
-// │ ├─ assets
-// │ └─ ...
-// ├─┬─ dist-electron
-// │ ├─ main.js
-// │ └─ ...
-
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(__dirname, '../public')
 
 let win: BrowserWindow | null
-
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
 function createWindow() {
   win = new BrowserWindow({
     width: 1366,
     height: 768,
-    // Icon logic: In dev, it's in public/. In prod, public assets are moved to dist/.
     icon: path.join(process.env.VITE_PUBLIC, 'icon.ico'), 
-    autoHideMenuBar: true, // Hide default menu
+    autoHideMenuBar: true,
+    // EXTREME SECURITY: REMOVE MENU BAR
+    frame: true, // Keep frame but remove default menus
+    kiosk: false, // Set true if you want full lockdown
     webPreferences: {
-      nodeIntegration: true, // Required for internal communication
-      contextIsolation: false, // Required for internal communication
-      // CRITICAL: Disable webSecurity to allow CORS and connection to local Node-RED (ws://)
-      // This is necessary when the app is loaded from file:// but connects to localhost
+      nodeIntegration: true, 
+      contextIsolation: false, 
       webSecurity: false, 
+      devTools: false // DISABLE DEVTOOLS BY DEFAULT
     },
   })
 
-  // --- HEALTH CHECK: CLEAR CACHE ---
-  // Clears HTTP cache, image cache, and script cache on every startup.
-  win.webContents.session.clearCache().then(() => {
-    console.log('Session cache cleared successfully to maintain disk health.');
+  // SECURITY: REMOVE MENU BAR
+  win.setMenu(null);
+
+  // SECURITY: BLOCK DEVTOOLS SHORTCUTS
+  // This prevents F12, Ctrl+Shift+I from opening inspection
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+        event.preventDefault();
+    }
+    if (input.key === 'F12') {
+        event.preventDefault();
+    }
+    if (input.control && input.key.toLowerCase() === 'r') {
+        // Optional: Block Reload
+        event.preventDefault();
+    }
   });
 
-  // Test active push message to Renderer-process.
+  win.webContents.session.clearCache().then(() => {
+    console.log('Secure Session Started');
+  });
+
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
   if (VITE_DEV_SERVER_URL) {
-    // Development: Load from Vite Dev Server
     win.loadURL(VITE_DEV_SERVER_URL)
+    // Only allow devtools in development mode
+    win.webContents.openDevTools(); 
   } else {
-    // Production: Load from local file system
-    // The 'base: "./"' config in vite.config.ts is crucial for this to work
     win.loadFile(path.join(process.env.DIST, 'index.html'))
   }
 }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Global Shortcuts for extra security (System Level)
+app.whenReady().then(() => {
+    createWindow();
+    
+    // Register global shortcuts to intercept specific key combinations
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+        // Do nothing (Block DevTools)
+        console.log('DevTools Blocked');
+    });
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
@@ -70,11 +84,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
 })
-
-app.whenReady().then(createWindow)

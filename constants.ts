@@ -77,8 +77,8 @@ export const LINE_CONFIGS: LineConfig[] = [
 export const APP_CONFIG = {
   // Connection Watchdog in ms. If no data for X ms, show warning.
   WATCHDOG_TIMEOUT: 10000, 
-  // Node-RED WebSocket URL (Uses Env Var or default local)
-  // To set in dev: create .env file with VITE_WS_URL=ws://192.168.1.50:1880/ws
+  // Node-RED WebSocket URL (Prioritize Env Var for Server deployment)
+  // Fallback to localhost for development if variable is missing.
   WS_URL: (import.meta as any).env?.VITE_WS_URL || 'ws://localhost:1880/ws/brewery-data', 
 };
 

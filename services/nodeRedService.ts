@@ -1,12 +1,11 @@
 import { APP_CONFIG } from '../constants';
+import { NodeRedPayload } from '../types';
 
 /**
  * PRODUCTION WEBSOCKET SERVICE
- * Handles persistent connection to Node-RED/MQTT Broker via WebSockets.
- * Includes auto-reconnect strategy and heartbeat monitoring.
  */
 
-type MessageCallback = (data: any) => void;
+type MessageCallback = (data: NodeRedPayload | NodeRedPayload[]) => void;
 type StatusCallback = (status: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'ERROR') => void;
 type ErrorCallback = (errorMsg: string) => void;
 
@@ -15,7 +14,7 @@ class NodeRedService {
   private reconnectTimeout: number | null = null;
   private isIntentionalClose = false;
   private listeners: MessageCallback[] = [];
-  private debugListeners: MessageCallback[] = []; // NEW: Listeners for raw debug data
+  private debugListeners: ((data: any) => void)[] = [];
   private statusListeners: StatusCallback[] = [];
   private errorListeners: ErrorCallback[] = [];
   private url: string;
@@ -24,22 +23,17 @@ class NodeRedService {
     this.url = APP_CONFIG.WS_URL;
   }
 
-  /**
-   * Initialize connection
-   */
   public connect(onMessage: MessageCallback, onStatusChange: StatusCallback, onError?: ErrorCallback) {
     this.listeners.push(onMessage);
     this.statusListeners.push(onStatusChange);
     if (onError) this.errorListeners.push(onError);
 
-    // If already connected, notify immediately
     if (this.ws?.readyState === WebSocket.OPEN) {
       onStatusChange('CONNECTED');
     } else {
       this.initWebSocket();
     }
 
-    // Return cleanup function
     return () => {
       this.listeners = this.listeners.filter(l => l !== onMessage);
       this.statusListeners = this.statusListeners.filter(l => l !== onStatusChange);
@@ -47,20 +41,13 @@ class NodeRedService {
     };
   }
 
-  /**
-   * Allow components to subscribe to raw data for debugging purposes
-   * without affecting the main application state logic.
-   */
-  public subscribeDebug(onRawData: MessageCallback) {
+  public subscribeDebug(onRawData: (data: any) => void) {
     this.debugListeners.push(onRawData);
     return () => {
         this.debugListeners = this.debugListeners.filter(l => l !== onRawData);
     };
   }
 
-  /**
-   * Update URL and reconnect (Used when changing settings)
-   */
   public updateConnectionConfig(url: string) {
     if (this.url === url) return;
     this.url = url;
@@ -80,7 +67,7 @@ class NodeRedService {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log('[WS] Connected to Industrial Bridge:', this.url);
+        console.log('[WS] Connected to Industrial Bridge');
         this.notifyStatus('CONNECTED');
         if (this.reconnectTimeout) {
           clearTimeout(this.reconnectTimeout);
@@ -90,20 +77,20 @@ class NodeRedService {
 
       this.ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const raw = JSON.parse(event.data);
+          // Cast raw to typed payload (Runtime validation could be added here for extra safety)
+          const data: NodeRedPayload | NodeRedPayload[] = raw;
+          
           this.notifyListeners(data);
-          this.notifyDebug(data); // Notify debuggers
+          this.notifyDebug(data);
         } catch (e) {
-          console.error('[WS] Failed to parse message:', event.data);
-          this.notifyError(`Erro ao processar dados JSON: ${e instanceof Error ? e.message : 'Formato inválido'}`);
-          // Also send raw string to debug if JSON parse fails, wrapping it
+          console.error('[WS] Parse error');
           this.notifyDebug({ error: 'JSON Parse Error', raw: event.data });
         }
       };
 
       this.ws.onclose = (event) => {
         if (!this.isIntentionalClose) {
-          console.warn('[WS] Disconnected. Retrying in 5s...', event.reason);
           this.notifyStatus('DISCONNECTED');
           this.scheduleReconnect();
         } else {
@@ -111,19 +98,14 @@ class NodeRedService {
         }
       };
 
-      this.ws.onerror = (event) => {
-        // Suppress generic "isTrusted" error object logging which confuses users.
-        // Usually indicates connection refused or target unreachable.
-        console.warn(`[WS] Connection failure to ${this.url}. Server might be down or unreachable.`);
+      this.ws.onerror = () => {
         this.notifyStatus('ERROR');
-        this.notifyError('Falha na conexão com o servidor WebSocket. Verifique se o Node-RED está rodando.');
-        // Close event will trigger reconnect logic automatically
+        this.notifyError('Falha na conexão com o servidor WebSocket.');
       };
 
     } catch (e) {
-      console.error('[WS] Connection Exception', e);
       this.notifyStatus('ERROR');
-      this.notifyError(`Não foi possível iniciar a conexão: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
+      this.notifyError(`Exception: ${e instanceof Error ? e.message : 'Unknown'}`);
       this.scheduleReconnect();
     }
   }
@@ -131,7 +113,6 @@ class NodeRedService {
   private scheduleReconnect() {
     if (!this.reconnectTimeout) {
       this.reconnectTimeout = window.setTimeout(() => {
-        console.log('[WS] Attempting Reconnect...');
         this.initWebSocket();
       }, 5000);
     }
@@ -149,7 +130,7 @@ class NodeRedService {
     }
   }
 
-  private notifyListeners(data: any) {
+  private notifyListeners(data: NodeRedPayload | NodeRedPayload[]) {
     this.listeners.forEach(l => l(data));
   }
 
