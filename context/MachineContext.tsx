@@ -60,6 +60,7 @@ const initialState: AppState = {
     floatingWindows: [
         { id: 'floating', name: 'Principal', x: 800, y: 350, w: 400, h: 300 }
     ],
+    areWindowsLocked: false, // Default unlocked
     widgetSize: 'NORMAL',
     showMediaPanel: true,
     showTicker: true,
@@ -162,7 +163,8 @@ type Action =
   // Window Actions
   | { type: 'ADD_WINDOW'; payload: { name: string } }
   | { type: 'REMOVE_WINDOW'; payload: string }
-  | { type: 'UPDATE_WINDOW'; payload: { id: string; config: Partial<FloatingWindowConfig> } };
+  | { type: 'UPDATE_WINDOW'; payload: { id: string; config: Partial<FloatingWindowConfig> } }
+  | { type: 'RESET_WINDOWS_DIMENSIONS' }; // NEW
 
 // Helper: Normalize Raw Data using Mapping Config
 const normalizeData = (rawData: any, config: LineConfig, currentMachineState?: MachineData): MachineData | null => {
@@ -347,6 +349,19 @@ function machineReducer(state: AppState, action: Action): AppState {
             }
         };
     }
+    case 'RESET_WINDOWS_DIMENSIONS': {
+        return {
+            ...state,
+            layout: {
+                ...state.layout,
+                floatingWindows: state.layout.floatingWindows.map(w => ({
+                    ...w,
+                    w: 200, // Reset Width
+                    h: 200  // Reset Height
+                }))
+            }
+        };
+    }
 
     default:
       return state;
@@ -424,6 +439,7 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addWindow = (name: string) => dispatch({ type: 'ADD_WINDOW', payload: { name } });
   const removeWindow = (id: string) => dispatch({ type: 'REMOVE_WINDOW', payload: id });
   const updateWindow = (id: string, config: Partial<FloatingWindowConfig>) => dispatch({ type: 'UPDATE_WINDOW', payload: { id, config } });
+  const resetWindowDimensions = () => dispatch({ type: 'RESET_WINDOWS_DIMENSIONS' });
 
   const clearError = () => dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -447,6 +463,7 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addWindow,
     removeWindow,
     updateWindow,
+    resetWindowDimensions,
     clearError
   };
 

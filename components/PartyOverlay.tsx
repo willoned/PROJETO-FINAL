@@ -90,7 +90,7 @@ const PartyOverlay: React.FC<Props> = ({ effect }) => {
   })), []);
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden select-none">
+    <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden select-none">
       
       {/* 1. GLOW EFFECT (Standard) */}
       {effect === 'GLOW' && (

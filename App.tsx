@@ -45,11 +45,15 @@ const Header = () => {
     return () => clearInterval(t);
   }, []);
 
-  const { title, subtitle, textColor, backgroundColor, alignment } = layout.header;
+  // Safety check using default empty object if header is undefined during migrations
+  const { title, subtitle, textColor, backgroundColor, alignment } = layout.header || { 
+      title: 'Industrial Viewport', 
+      subtitle: '', 
+      textColor: '#ffffff', 
+      backgroundColor: '#1a110d', 
+      alignment: 'LEFT' 
+  };
 
-  // Lógica de Posicionamento da Marca d'água
-  // Se Título CENTRALIZADO -> Marca d'água vai para a ESQUERDA
-  // Se Título na ESQUERDA -> Marca d'água vai para o CENTRO
   const watermarkPositionClass = alignment === 'CENTER' 
       ? "left-6 top-1/2 -translate-y-1/2 items-start text-left" 
       : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center text-center";
@@ -64,7 +68,7 @@ const Header = () => {
     >
       {/* BRANDING WATERMARK - OVERLAY EVERYTHING */}
       <div className={`absolute ${watermarkPositionClass} flex flex-col justify-center pointer-events-none select-none z-[60] opacity-40 transition-all duration-500 mix-blend-screen`}>
-          <span className="font-mono font-black text-lg text-white tracking-widest leading-none drop-shadow-lg">&lt;ITF-TEtech/&gt;</span>
+          <span className="font-mono font-black text-lg text-white tracking-widest leading-none drop-shadow-lg">&lt;ITF-TEch/&gt;</span>
           <span className="text-[9px] text-white uppercase tracking-[0.2em] font-medium mt-0.5 leading-none drop-shadow-md">Produced by Willon Eduardo</span>
       </div>
 
@@ -119,7 +123,7 @@ const TopMediaBanner = () => {
     const handleMouseDown = (e: React.MouseEvent) => {
         setIsResizing(true);
         startY.current = e.clientY;
-        startH.current = layout.header.topMediaHeight;
+        startH.current = layout.header?.topMediaHeight || 200;
         document.body.style.cursor = 'row-resize';
         document.body.style.userSelect = 'none';
         
@@ -144,7 +148,7 @@ const TopMediaBanner = () => {
         window.removeEventListener('mouseup', handleMouseUp);
     }, [handleMouseMove]);
 
-    if (!layout.header.showTopMedia) return null;
+    if (!layout.header?.showTopMedia) return null;
 
     const borderWidth = layout.header.topMediaBorderWidth ?? 1;
 
@@ -171,7 +175,7 @@ const TopMediaBanner = () => {
 };
 
 // Resizable Wrapper for the Ticker
-const ResizableTicker = ({ children }: { children: React.ReactNode }) => {
+const ResizableTicker = ({ children }: { children?: React.ReactNode }) => {
     const { layout, updateLayout } = useMachineContext();
     const [isResizing, setIsResizing] = useState(false);
     const startY = useRef(0);
@@ -370,7 +374,7 @@ const CanvasLayout = () => {
         {layout.isPartyMode && <PartyOverlay effect={layout.partyEffect} />}
 
         {/* FLOATING LOGO WIDGET */}
-        {layout.logoWidget.show && (
+        {layout.logoWidget?.show && (
             <div
                 style={{
                     position: 'absolute',
@@ -425,13 +429,15 @@ const CanvasLayout = () => {
                 }}
                 className={`rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden border transition-shadow duration-200 group ${layout.isPartyMode ? 'border-purple-500 shadow-purple-500/20' : 'bg-brewery-card border-brewery-accent/50'}`}
             >
-                {/* Drag Handle Bar */}
-                <div 
-                    className="h-6 bg-black/60 flex items-center justify-center cursor-move opacity-0 group-hover:opacity-100 transition-opacity absolute top-0 left-0 right-0 z-50 backdrop-blur-sm"
-                    onMouseDown={(e) => handleDragStart(e, 'MEDIA', win.id, win.x, win.y)}
-                >
-                    <div className="w-10 h-1 rounded-full bg-white/20" />
-                </div>
+                {/* Drag Handle Bar - Hides if windows are locked */}
+                {!layout.areWindowsLocked && (
+                    <div 
+                        className="h-6 bg-black/60 flex items-center justify-center cursor-move opacity-0 group-hover:opacity-100 transition-opacity absolute top-0 left-0 right-0 z-50 backdrop-blur-sm"
+                        onMouseDown={(e) => handleDragStart(e, 'MEDIA', win.id, win.x, win.y)}
+                    >
+                        <div className="w-10 h-1 rounded-full bg-white/20" />
+                    </div>
+                )}
 
                 <MediaPanel playlistKey={win.id} />
 
@@ -440,13 +446,15 @@ const CanvasLayout = () => {
                     <span className="text-[10px] text-white/50 bg-black/50 px-1 rounded">{win.name}</span>
                 </div>
 
-                {/* Resize Handle */}
-                <div 
-                    className="absolute bottom-0 right-0 w-6 h-6 flex items-end justify-end p-0.5 cursor-nwse-resize text-white/50 hover:text-white z-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onMouseDown={(e) => handleResizeStart(e, 'MEDIA', win.id)}
-                >
-                    <Scaling size={14} className="transform rotate-90" />
-                </div>
+                {/* Resize Handle - Hides if windows are locked */}
+                {!layout.areWindowsLocked && (
+                    <div 
+                        className="absolute bottom-0 right-0 w-6 h-6 flex items-end justify-end p-0.5 cursor-nwse-resize text-white/50 hover:text-white z-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onMouseDown={(e) => handleResizeStart(e, 'MEDIA', win.id)}
+                    >
+                        <Scaling size={14} className="transform rotate-90" />
+                    </div>
+                )}
             </div>
         ))}
 
@@ -498,16 +506,16 @@ const CanvasLayout = () => {
 };
 
 const App: React.FC = () => {
-    return (
-        <MachineProvider>
-            <div className="flex flex-col h-screen w-full bg-[#0f0a08] text-zinc-100 overflow-hidden font-sans">
-                <Header />
-                <div className="flex-1 relative overflow-hidden flex flex-col">
-                    <CanvasLayout />
-                </div>
-            </div>
-        </MachineProvider>
-    );
+  return (
+    <MachineProvider>
+      <div className="flex flex-col h-screen bg-brewery-bg text-white font-sans overflow-hidden">
+        <Header />
+        <div className="flex-1 overflow-hidden relative">
+          <CanvasLayout />
+        </div>
+      </div>
+    </MachineProvider>
+  );
 };
 
 export default App;

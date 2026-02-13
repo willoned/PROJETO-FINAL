@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Info, AlertCircle, Megaphone, Radio } from 'lucide-react';
+import { AlertTriangle, Info, AlertCircle, Megaphone } from 'lucide-react';
 import { Announcement } from '../types';
 import { useMachineContext } from '../context/MachineContext';
 
@@ -49,20 +49,9 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
         className="bg-brewery-card border-y border-brewery-border overflow-hidden relative flex items-center group z-40 shadow-lg"
         style={{ height: height }}
     >
-      {/* Label Badge */}
-      <div className="absolute left-0 top-0 bottom-0 bg-indigo-600 px-6 flex items-center z-20 shadow-[4px_0_15px_rgba(0,0,0,0.5)]">
-        <span className="font-bold text-white uppercase text-xs tracking-wider flex items-center gap-2">
-            <Radio size={16} className="animate-pulse" />
-            Avisos
-        </span>
-      </div>
-      
-      {/* Gradient Mask */}
-      <div className="absolute left-24 top-0 bottom-0 w-24 bg-gradient-to-r from-brewery-card to-transparent z-10 pointer-events-none" />
-
       {/* Animation wrapper */}
       <div 
-        className="flex animate-marquee whitespace-nowrap hover:pause will-change-transform pl-40 items-center h-full"
+        className="flex animate-marquee whitespace-nowrap hover:pause will-change-transform pl-4 items-center h-full"
         style={{ animationDuration: `${duration}s` }}
       >
         {seamlessList.map((announcement, index) => (

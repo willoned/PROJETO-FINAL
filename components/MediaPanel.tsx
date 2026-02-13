@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMachineContext } from '../context/MachineContext';
-import { Upload, Play, Pause, Plus, FileVideo, FileImage, List, X, ArrowUp, ArrowDown, Trash2, FileCode, Globe, Timer } from 'lucide-react';
+import { Upload, Play, Pause, Plus, FileVideo, FileImage, List, X, ArrowUp, ArrowDown, Trash2, FileCode, Globe } from 'lucide-react';
 
 interface Props {
     playlistKey: string;
@@ -19,6 +19,12 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   
   // Timer State (Remaining Seconds)
   const [timeLeft, setTimeLeft] = useState(0);
+  // Max Duration for the Circular Progress
+  const [maxDuration, setMaxDuration] = useState(1);
+
+  // Zoom State
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Track created URLs to revoke them on unmount to prevent memory leaks
   const createdUrls = useRef<Set<string>>(new Set());
@@ -46,6 +52,9 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
       return;
     }
 
+    // Reset zoom on slide change
+    setZoomLevel(1);
+
     // VIDEO Logic: Handled by <video onTimeUpdate>
     if (itemToRender.type === 'VIDEO') {
         return; 
@@ -53,6 +62,7 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
 
     // IMAGE/HTML Logic: Countdown Interval
     const durationSec = itemToRender.duration;
+    setMaxDuration(durationSec); // Set total duration for progress calculation
     setTimeLeft(durationSec);
 
     const startTime = Date.now();
@@ -75,6 +85,25 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         clearInterval(interval);
     };
   }, [currentIndex, isPlaying, mediaPlaylist.length, itemToRender]); 
+
+  // Zoom Logic
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const delta = -Math.sign(e.deltaY) * 0.1;
+        setZoomLevel(prev => Math.min(Math.max(0.5, prev + delta), 5));
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
 
   const processFiles = useCallback((files: FileList | null) => {
     if (!files) return;
@@ -127,6 +156,17 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   // Determine fit style based on layout setting
   const fitClass = layout.mediaFit === 'COVER' ? 'object-cover' : 'object-contain';
 
+  // Circular Progress Calculation
+  // Calculate fill percentage: starts at 0% (timeLeft == max) -> goes to 100% (timeLeft == 0)
+  const progressPercentage = maxDuration > 0 
+    ? Math.max(0, Math.min(100, ((maxDuration - timeLeft) / maxDuration) * 100))
+    : 0;
+  
+  // SVG Config
+  const circleRadius = 16;
+  const circleCircumference = 2 * Math.PI * circleRadius;
+  const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
+
   // --- Empty State ---
   if (mediaPlaylist.length === 0) {
     return (
@@ -167,61 +207,83 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         </div>
       )}
 
-      {/* NEW: Top Left Countdown Indicator */}
+      {/* NEW: Top Left Circular Loader (Minimalist - Only Progressive Ring) */}
       {isPlaying && (
-        <div className="absolute top-4 left-4 z-20 bg-black/60 backdrop-blur-md border border-white/10 rounded-full px-3 py-1 text-xs font-mono font-bold text-white flex items-center gap-2 shadow-lg animate-in fade-in duration-300">
-            <Timer size={12} className="text-brewery-accent" />
-            <span>{timeLeft}s</span>
+        <div className="absolute top-4 left-4 z-20 w-20 h-20 flex items-center justify-center animate-in fade-in duration-300 pointer-events-none">
+            {/* SVG Loader */}
+            <svg className="w-full h-full -rotate-90 transform relative z-10" viewBox="0 0 40 40">
+                {/* Progress Ring */}
+                <circle
+                    className="text-brewery-accent transition-all duration-1000 ease-linear"
+                    cx="20" cy="20" r={circleRadius}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={circleCircumference}
+                    strokeDashoffset={strokeDashoffset}
+                />
+            </svg>
         </div>
       )}
 
-      {/* Display Area */}
-      <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden w-full h-full">
-        {currentItem.type === 'HTML' ? (
-            <iframe 
-                key={currentItem.id}
-                src={currentItem.url}
-                className="w-full h-full border-0 bg-white"
-                sandbox="allow-scripts allow-same-origin"
-                title={currentItem.name}
+      {/* Display Area - Scales with Zoom */}
+      <div 
+        ref={contentRef}
+        className="flex-1 relative flex items-center justify-center bg-black overflow-hidden w-full h-full"
+      >
+        <div 
+            style={{ 
+                transform: `scale(${zoomLevel})`,
+                transition: 'transform 0.1s ease-out'
+            }} 
+            className="w-full h-full flex items-center justify-center"
+        >
+            {currentItem.type === 'HTML' ? (
+                <iframe 
+                    key={currentItem.id}
+                    src={currentItem.url}
+                    className="w-full h-full border-0 bg-white"
+                    sandbox="allow-scripts allow-same-origin"
+                    title={currentItem.name}
+                />
+            ) : currentItem.type === 'IMAGE' ? (
+            <img 
+                key={currentItem.id} 
+                src={currentItem.url} 
+                alt={currentItem.name} 
+                className={`w-full h-full ${fitClass} animate-in fade-in duration-700`}
             />
-        ) : currentItem.type === 'IMAGE' ? (
-          <img 
-            key={currentItem.id} 
-            src={currentItem.url} 
-            alt={currentItem.name} 
-            className={`w-full h-full ${fitClass} animate-in fade-in duration-700`}
-          />
-        ) : (
-          <video 
-            key={currentItem.id}
-            src={currentItem.url} 
-            className={`w-full h-full ${fitClass}`}
-            autoPlay 
-            muted 
-            playsInline
-            onTimeUpdate={(e) => {
-                const v = e.currentTarget;
-                if(v.duration) {
-                    const left = Math.ceil(v.duration - v.currentTime);
-                    // Avoid unnecessary state updates if second hasn't changed
-                    if (left !== timeLeft) setTimeLeft(left);
-                }
-            }}
-            onEnded={() => {
-                setCurrentIndex((prev) => (prev + 1) % mediaPlaylist.length)
-            }}
-          />
-        )}
+            ) : (
+            <video 
+                key={currentItem.id}
+                src={currentItem.url} 
+                className={`w-full h-full ${fitClass}`}
+                autoPlay 
+                muted 
+                playsInline
+                onLoadedMetadata={(e) => {
+                    // Set the specific video duration as max
+                    setMaxDuration(e.currentTarget.duration);
+                }}
+                onTimeUpdate={(e) => {
+                    const v = e.currentTarget;
+                    if(v.duration) {
+                        const left = Math.ceil(v.duration - v.currentTime);
+                        // Avoid unnecessary state updates if second hasn't changed
+                        if (left !== timeLeft) setTimeLeft(left);
+                    }
+                }}
+                onEnded={() => {
+                    setCurrentIndex((prev) => (prev + 1) % mediaPlaylist.length)
+                }}
+            />
+            )}
+        </div>
         
-        {/* Info Overlay */}
-        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pb-6 z-10 pointer-events-none transition-opacity duration-300 ${showPlaylist ? 'opacity-0' : 'opacity-100'}`}>
-          <div className="flex items-center gap-2 mb-2">
-             {currentItem.type === 'VIDEO' ? <FileVideo size={14} className="text-indigo-400"/> : 
-              currentItem.type === 'HTML' ? <Globe size={14} className="text-orange-400"/> :
-              <FileImage size={14} className="text-emerald-400"/>}
-             <p className="text-white font-medium truncate drop-shadow-md text-sm">{currentItem.name}</p>
-          </div>
+        {/* Info Overlay - Outside Zoom Context */}
+        {/* Removed Media Name/Icon per request - kept only playlist indicators */}
+        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pb-2 z-10 pointer-events-none transition-opacity duration-300 ${showPlaylist ? 'opacity-0' : 'opacity-100'} flex justify-center`}>
           {/* Playlist Indicators (Small Dots) */}
           <div className="flex gap-1 h-1 bg-zinc-800/50 rounded-full overflow-hidden w-1/3 opacity-50">
              {mediaPlaylist.map((item, idx) => (

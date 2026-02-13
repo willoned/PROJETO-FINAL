@@ -1,4 +1,5 @@
 
+
 // Visual preferences for what data to show on the card
 export interface DisplayConfig {
   showVolume: boolean;  // Production Count
@@ -142,6 +143,7 @@ export interface LayoutSettings {
   header: HeaderSettings; // NEW: Header config
   logoWidget: LogoWidgetSettings; // NEW: Floating Logo
   floatingWindows: FloatingWindowConfig[]; // UPDATED: Multiple windows support
+  areWindowsLocked: boolean; // NEW: Locks drag and resize
   widgetSize: WidgetSize; // Global default
   showMediaPanel: boolean; // Controls if ANY floating window is shown (Global toggle)
   showTicker: boolean;
@@ -199,6 +201,7 @@ export interface AppContextType extends AppState {
   addWindow: (name: string) => void;
   removeWindow: (id: string) => void;
   updateWindow: (id: string, config: Partial<FloatingWindowConfig>) => void;
+  resetWindowDimensions: () => void; // NEW Action
 
   // Line Management Actions
   addLine: (config: LineConfig) => void;

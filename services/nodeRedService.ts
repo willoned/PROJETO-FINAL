@@ -111,15 +111,17 @@ class NodeRedService {
         }
       };
 
-      this.ws.onerror = (error) => {
-        console.error('[WS] Error:', error);
+      this.ws.onerror = (event) => {
+        // Suppress generic "isTrusted" error object logging which confuses users.
+        // Usually indicates connection refused or target unreachable.
+        console.warn(`[WS] Connection failure to ${this.url}. Server might be down or unreachable.`);
         this.notifyStatus('ERROR');
-        this.notifyError('Falha na conexão com o servidor WebSocket. Verifique as configurações de rede.');
-        // Close event will trigger reconnect
+        this.notifyError('Falha na conexão com o servidor WebSocket. Verifique se o Node-RED está rodando.');
+        // Close event will trigger reconnect logic automatically
       };
 
     } catch (e) {
-      console.error('[WS] Connection Failed', e);
+      console.error('[WS] Connection Exception', e);
       this.notifyStatus('ERROR');
       this.notifyError(`Não foi possível iniciar a conexão: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
       this.scheduleReconnect();

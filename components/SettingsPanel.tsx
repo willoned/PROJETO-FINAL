@@ -10,7 +10,7 @@ import {
   Trophy, Medal, Cake, Banknote, Target, Flag, AlignLeft, AlignCenter, Image as ImageIcon, Upload, Scissors,
   BarChart3, TrendingUp, Scale, Timer, Layers, Maximize, Rss, Tv, MousePointer2, Terminal, Pause, Play, Eraser,
   CopyPlus, Link2, Network, CalendarClock, ChevronRight, Bug, FileJson, Hash, Tags, Wifi, Cpu, Globe, ArrowRightLeft,
-  Move, Palette, CreditCard
+  Move, Palette, CreditCard, Lock, Unlock, RefreshCcw
 } from 'lucide-react';
 import { AnnouncementType, LineConfig } from '../types';
 import { LINE_CONFIGS as DEFAULT_LINES } from '../constants';
@@ -90,7 +90,7 @@ const SettingsPanel: React.FC = () => {
     layout, updateLayout,
     lineConfigs, addLine, removeLine, updateLine,
     connectionConfig, updateConnectionConfig,
-    addWindow, removeWindow, updateWindow,
+    addWindow, removeWindow, updateWindow, resetWindowDimensions,
     connectionStatus
   } = useMachineContext();
   
@@ -788,28 +788,55 @@ const SettingsPanel: React.FC = () => {
                             {/* LEFT COL: WINDOW LIST & GLOBAL SETTINGS */}
                             <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar">
                                 {/* Global Settings Card */}
-                                <div className="bg-brewery-card border border-brewery-border rounded-lg p-4">
-                                    <h3 className="text-xs font-bold text-brewery-muted uppercase tracking-widest mb-3">Ajustes Globais</h3>
-                                    <div className="flex items-center justify-between mb-3">
+                                <div className="bg-brewery-card border border-brewery-border rounded-lg p-4 space-y-4">
+                                    <h3 className="text-xs font-bold text-brewery-muted uppercase tracking-widest mb-1">Ajustes Globais</h3>
+                                    
+                                    {/* Media Fit Controls */}
+                                    <div className="flex items-center justify-between">
                                         <label className="text-sm font-bold text-white flex items-center gap-2">
                                             <Expand size={14} /> Preenchimento de Mídia
                                         </label>
-                                        <div className="flex bg-black/40 rounded p-0.5 border border-white/10">
+                                        <div className="flex bg-black/40 rounded-lg p-1 border border-white/10 w-36 shrink-0">
                                             <button 
                                                 onClick={() => updateLayout({ mediaFit: 'CONTAIN' })}
-                                                className={`px-2 py-1 text-[10px] rounded font-bold transition-colors ${layout.mediaFit === 'CONTAIN' ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                className={`flex-1 py-1.5 text-[10px] rounded-md font-bold transition-all text-center ${layout.mediaFit === 'CONTAIN' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
                                             >
                                                 CONTAIN
                                             </button>
                                             <button 
                                                 onClick={() => updateLayout({ mediaFit: 'COVER' })}
-                                                className={`px-2 py-1 text-[10px] rounded font-bold transition-colors ${layout.mediaFit === 'COVER' ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                className={`flex-1 py-1.5 text-[10px] rounded-md font-bold transition-all text-center ${layout.mediaFit === 'COVER' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
                                             >
                                                 COVER
                                             </button>
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-zinc-500">Define como imagens e vídeos se comportam dentro das janelas.</p>
+
+                                    {/* Lock and Reset Actions */}
+                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                                        <button 
+                                            onClick={() => updateLayout({ areWindowsLocked: !layout.areWindowsLocked })}
+                                            className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
+                                                layout.areWindowsLocked 
+                                                ? 'bg-rose-500/20 border-rose-500 text-rose-400' 
+                                                : 'bg-black/20 border-white/10 text-zinc-400 hover:bg-white/5'
+                                            }`}
+                                            title="Travar posição das janelas"
+                                        >
+                                            {layout.areWindowsLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                                            <span className="text-xs font-bold">{layout.areWindowsLocked ? 'Travado' : 'Destravado'}</span>
+                                        </button>
+
+                                        <button 
+                                            onClick={resetWindowDimensions}
+                                            className="flex items-center justify-center gap-2 p-3 rounded-lg bg-black/20 border border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white transition-all"
+                                            title="Resetar para 200x200px"
+                                        >
+                                            <RefreshCcw size={16} />
+                                            <span className="text-xs font-bold">Reset Dim.</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500">Trave as janelas para evitar movimentos acidentais ou resete o tamanho para o padrão.</p>
                                 </div>
 
                                 {/* Window List Manager */}
@@ -1157,9 +1184,9 @@ const SettingsPanel: React.FC = () => {
                                         <div className="col-span-1 md:col-span-3">
                                             <label className="label-pro">Host / IP do Broker</label>
                                             <div className="relative">
-                                                <Globe size={14} className="absolute left-3 top-3 text-brewery-muted"/>
+                                                <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brewery-muted"/>
                                                 <input 
-                                                    className="input-pro pl-9 font-mono"
+                                                    className="input-pro !pl-9 font-mono"
                                                     placeholder="localhost ou 192.168.1.50"
                                                     value={connectionConfig.host}
                                                     onChange={(e) => updateConnectionConfig({ host: e.target.value })}
@@ -1172,9 +1199,9 @@ const SettingsPanel: React.FC = () => {
                                         <div className="col-span-1">
                                             <label className="label-pro">Porta</label>
                                             <div className="relative">
-                                                <Hash size={14} className="absolute left-3 top-3 text-brewery-muted"/>
+                                                <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brewery-muted"/>
                                                 <input 
-                                                    className="input-pro pl-9 font-mono"
+                                                    className="input-pro !pl-9 font-mono"
                                                     placeholder="1880"
                                                     value={connectionConfig.port}
                                                     onChange={(e) => updateConnectionConfig({ port: e.target.value })}
@@ -1184,9 +1211,9 @@ const SettingsPanel: React.FC = () => {
                                         <div className="col-span-1 md:col-span-3">
                                             <label className="label-pro">Topic / Path (Rota WebSocket)</label>
                                             <div className="relative">
-                                                <Network size={14} className="absolute left-3 top-3 text-brewery-muted"/>
+                                                <Network size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brewery-muted"/>
                                                 <input 
-                                                    className="input-pro pl-9 font-mono"
+                                                    className="input-pro !pl-9 font-mono"
                                                     placeholder="/ws/brewery-data"
                                                     value={connectionConfig.path}
                                                     onChange={(e) => updateConnectionConfig({ path: e.target.value })}
@@ -1240,9 +1267,9 @@ const SettingsPanel: React.FC = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Database size={10} /> Volume (Total)</label>
                                                 <div className="relative">
-                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
                                                     <input 
-                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-emerald-400/90 bg-black/40 border-white/5 focus:border-emerald-500/50" 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-emerald-400/90 bg-black/40 border-white/5 focus:border-emerald-500/50" 
                                                         value={line.dataMapping?.productionKey || ''}
                                                         onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, productionKey: e.target.value } })}
                                                         placeholder="key"
@@ -1252,9 +1279,9 @@ const SettingsPanel: React.FC = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Gauge size={10} /> Velocidade</label>
                                                 <div className="relative">
-                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
                                                     <input 
-                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-blue-400/90 bg-black/40 border-white/5 focus:border-blue-500/50" 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-blue-400/90 bg-black/40 border-white/5 focus:border-blue-500/50" 
                                                         value={line.dataMapping?.speedKey || ''}
                                                         onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, speedKey: e.target.value } })}
                                                         placeholder="key"
@@ -1264,9 +1291,9 @@ const SettingsPanel: React.FC = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Activity size={10} /> Temperatura</label>
                                                 <div className="relative">
-                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
                                                     <input 
-                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-amber-400/90 bg-black/40 border-white/5 focus:border-amber-500/50" 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-amber-400/90 bg-black/40 border-white/5 focus:border-amber-500/50" 
                                                         value={line.dataMapping?.temperatureKey || ''}
                                                         onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, temperatureKey: e.target.value } })}
                                                         placeholder="key"
@@ -1276,9 +1303,9 @@ const SettingsPanel: React.FC = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Zap size={10} /> Eficiência/OEE</label>
                                                 <div className="relative">
-                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
                                                     <input 
-                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-purple-400/90 bg-black/40 border-white/5 focus:border-purple-500/50" 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-purple-400/90 bg-black/40 border-white/5 focus:border-purple-500/50" 
                                                         value={line.dataMapping?.efficiencyKey || ''}
                                                         onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, efficiencyKey: e.target.value } })}
                                                         placeholder="key"
@@ -1288,9 +1315,9 @@ const SettingsPanel: React.FC = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Info size={10} /> Status (String)</label>
                                                 <div className="relative">
-                                                    <FileJson size={12} className="absolute left-2 top-2.5 text-brewery-muted opacity-50"/>
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
                                                     <input 
-                                                        className="input-pro pl-7 py-1.5 text-xs font-mono text-zinc-300/90 bg-black/40 border-white/5 focus:border-zinc-500/50" 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-zinc-300/90 bg-black/40 border-white/5 focus:border-zinc-500/50" 
                                                         value={line.dataMapping?.statusKey || ''}
                                                         onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, statusKey: e.target.value } })}
                                                         placeholder="key"
