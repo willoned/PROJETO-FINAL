@@ -146,6 +146,7 @@ export interface LayoutSettings {
   isPartyMode: boolean;
   partyMessage?: string;
   partyEffect: PartyEffect;
+  partyColor?: string;
   customPartyImage?: string;
 }
 
@@ -159,28 +160,11 @@ export interface ConnectionSettings {
   autoConnect: boolean;
 }
 
-// --- AUTH TYPES ---
-export type UserRole = 'ADMIN' | 'OPERATOR';
-
-export interface User {
-  id: number;
-  username: string;
-  role: UserRole;
-}
-
-export interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (token: string, user: User) => void;
-  logout: () => void;
-}
-
-// CONTEXT INTERFACES (SPLIT)
+// CONTEXT INTERFACES
 
 export interface LayoutContextType {
   lineConfigs: LineConfig[];
+  
   playlists: Record<string, MediaItem[]>;
   announcements: Announcement[];
   showSettings: boolean;

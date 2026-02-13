@@ -16,21 +16,14 @@
     "start:web": "node server.js"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
     "bytenode": "^1.5.6",
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.563.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "recharts": "^3.7.0",
-    "sqlite3": "^5.1.7"
+    "recharts": "^3.7.0"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
-    "@types/cors": "^2.8.17",
-    "@types/jsonwebtoken": "^9.0.6",
     "@types/react": "^19.2.4",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^4.2.1",

@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { LayoutProvider, useLayoutContext } from './context/LayoutContext';
 import { DataProvider, useDataContext } from './context/DataContext';
-import { AuthProvider, useAuth } from './context/AuthContext'; // NEW AUTH
 import MachineCard from './components/MachineCard';
 import AnnouncementsTicker from './components/AnnouncementsTicker';
 import MediaPanel from './components/MediaPanel';
@@ -11,10 +10,9 @@ import AlertOverlay from './components/AlertOverlay';
 import Header from './components/Header';
 import ErrorToast from './components/ErrorToast';
 import TopMediaBanner from './components/TopMediaBanner';
-import LoginPage from './components/LoginPage'; // NEW LOGIN
 import { Grid3X3, Beer, PartyPopper, Scaling } from 'lucide-react';
 
-// ... (Existing ResizableTicker component - unchanged)
+// Resizable Wrapper for the Ticker
 const ResizableTicker = ({ children }: { children?: React.ReactNode }) => {
     const { layout, updateLayout } = useLayoutContext();
     const [isResizing, setIsResizing] = useState(false);
@@ -61,7 +59,6 @@ const ResizableTicker = ({ children }: { children?: React.ReactNode }) => {
     );
 };
 
-// ... (Existing CanvasLayout component - unchanged)
 const CanvasLayout = () => {
   const { announcements, layout, updateLayout, lineConfigs, updateLine, toggleSettings, updateWindow } = useLayoutContext();
   const { machines } = useDataContext();
@@ -318,69 +315,50 @@ const CanvasLayout = () => {
   );
 };
 
-// Separate Content Component to use useAuth hook
-const AppContent: React.FC = () => {
-    const { isAuthenticated, isLoading } = useAuth();
-
-    // BROWSER KIOSK PROTECTION
-    useEffect(() => {
-        // 1. Prevent Right Click
-        const handleContextMenu = (e: MouseEvent) => {
-            e.preventDefault();
-        };
-    
-        // 2. Prevent Developer Tools Shortcuts
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // F12
-            if (e.key === 'F12') {
-                e.preventDefault();
-            }
-            // Ctrl+Shift+I (Inspect), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspect Element)
-            if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
-                e.preventDefault();
-            }
-            // Ctrl+U (View Source)
-            if (e.ctrlKey && e.key === 'u') {
-                e.preventDefault();
-            }
-        };
-    
-        document.addEventListener('contextmenu', handleContextMenu);
-        document.addEventListener('keydown', handleKeyDown);
-    
-        return () => {
-            document.removeEventListener('contextmenu', handleContextMenu);
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, []);
-
-    if (isLoading) {
-        return <div className="h-screen bg-[#0f0a08] flex items-center justify-center text-brewery-accent font-mono animate-pulse">CARREGANDO SISTEMA...</div>;
-    }
-
-    if (!isAuthenticated) {
-        return <LoginPage />;
-    }
-
-    return (
-        <LayoutProvider>
-          <DataProvider>
-            <div className="flex flex-col h-screen bg-brewery-bg text-white font-sans overflow-hidden animate-in fade-in duration-500">
-              <Header />
-              <div className="flex-1 overflow-hidden relative">
-                <CanvasLayout />
-              </div>
-            </div>
-          </DataProvider>
-        </LayoutProvider>
-    );
-};
-
 const App: React.FC = () => {
+  // BROWSER KIOSK PROTECTION
+  useEffect(() => {
+    // 1. Prevent Right Click
+    const handleContextMenu = (e: MouseEvent) => {
+        e.preventDefault();
+    };
+
+    // 2. Prevent Developer Tools Shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+        // F12
+        if (e.key === 'F12') {
+            e.preventDefault();
+        }
+        // Ctrl+Shift+I (Inspect), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspect Element)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
+            e.preventDefault();
+        }
+        // Ctrl+U (View Source)
+        if (e.ctrlKey && e.key === 'u') {
+            e.preventDefault();
+        }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+        document.removeEventListener('contextmenu', handleContextMenu);
+        document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   return (
-    <AuthProvider>
-        <AppContent />
-    </AuthProvider>
+    <LayoutProvider>
+      <DataProvider>
+        <div className="flex flex-col h-screen bg-brewery-bg text-white font-sans overflow-hidden">
+          <Header />
+          <div className="flex-1 overflow-hidden relative">
+            <CanvasLayout />
+          </div>
+        </div>
+      </DataProvider>
+    </LayoutProvider>
   );
 };
 

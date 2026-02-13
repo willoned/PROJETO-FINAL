@@ -1,7 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useMachineContext } from '../context/MachineContext';
-import { useAuth } from '../context/AuthContext'; // NEW
-import UserManagementModal from './UserManagementModal'; // NEW
 import { nodeRedService } from '../services/nodeRedService';
 import { 
   X, Trash2, Plus, Monitor, Bell, LayoutTemplate, Factory, 
@@ -12,7 +10,7 @@ import {
   Trophy, Medal, Cake, Banknote, Target, Flag, AlignLeft, AlignCenter, Image as ImageIcon, Upload, Scissors,
   BarChart3, TrendingUp, Scale, Timer, Layers, Maximize, Rss, Tv, MousePointer2, Terminal, Pause, Play, Eraser,
   CopyPlus, Link2, Network, CalendarClock, ChevronRight, Bug, FileJson, Hash, Tags, Wifi, Cpu, Globe, ArrowRightLeft,
-  Move, Palette, CreditCard, Lock, Unlock, RefreshCcw, Users, LogOut
+  Move, Palette, CreditCard, Lock, Unlock, RefreshCcw
 } from 'lucide-react';
 import { AnnouncementType, LineConfig } from '../types';
 import { LINE_CONFIGS as DEFAULT_LINES } from '../constants';
@@ -96,10 +94,6 @@ const SettingsPanel: React.FC = () => {
     connectionStatus
   } = useMachineContext();
   
-  // Auth Context
-  const { user, logout } = useAuth();
-  const [showUserModal, setShowUserModal] = useState(false);
-
   const [activeTab, setActiveTab] = useState<'LINES' | 'API' | 'LAYOUT' | 'MEDIA' | 'ALERTS' | 'PARTY' | 'HEADER'>('LINES');
   
   // API Sub-tabs state
@@ -302,8 +296,6 @@ const SettingsPanel: React.FC = () => {
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex justify-center items-center p-4 md:p-10">
       
-      {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} />}
-
       {/* PROFESSIONAL WINDOW CONTAINER */}
       <div className="bg-brewery-card border border-brewery-border w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
@@ -315,22 +307,12 @@ const SettingsPanel: React.FC = () => {
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-brewery-text tracking-tight">Painel Mestre</h2>
-                    <p className="text-xs text-brewery-muted uppercase tracking-widest font-semibold">
-                        Logado como: <span className="text-white">{user?.username}</span> ({user?.role})
-                    </p>
+                    <p className="text-xs text-brewery-muted uppercase tracking-widest font-semibold">Configuração Cervejaria</p>
                 </div>
             </div>
-            <div className="flex gap-2">
-                <button 
-                    onClick={() => { toggleSettings(); logout(); }}
-                    className="p-2 bg-rose-950/30 text-rose-500 hover:bg-rose-950 hover:text-rose-400 rounded-lg transition-colors flex items-center gap-2 px-4 text-xs font-bold uppercase"
-                >
-                    <LogOut size={16} /> Sair
-                </button>
-                <button onClick={toggleSettings} className="p-2 hover:bg-rose-950 hover:text-rose-500 text-brewery-muted rounded-lg transition-colors">
-                    <X size={24} />
-                </button>
-            </div>
+            <button onClick={toggleSettings} className="p-2 hover:bg-rose-950 hover:text-rose-500 text-brewery-muted rounded-lg transition-colors">
+                <X size={24} />
+            </button>
         </div>
 
         {/* MAIN BODY (SIDEBAR + CONTENT) */}
@@ -345,19 +327,6 @@ const SettingsPanel: React.FC = () => {
                 <NavButton active={activeTab === 'MEDIA'} onClick={() => setActiveTab('MEDIA')} icon={<Monitor size={18} />} label="Mídia & Menu" />
                 <NavButton active={activeTab === 'ALERTS'} onClick={() => setActiveTab('ALERTS')} icon={<Bell size={18} />} label="Avisos Gerais" />
                 <NavButton active={activeTab === 'PARTY'} onClick={() => setActiveTab('PARTY')} icon={<PartyPopper size={18} />} label="Modo Festa" />
-                
-                {/* ADMIN ONLY SECTION */}
-                {user?.role === 'ADMIN' && (
-                    <div className="mt-auto pt-4 border-t border-white/5">
-                        <button
-                            onClick={() => setShowUserModal(true)}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium text-indigo-400 hover:bg-indigo-900/20"
-                        >
-                            <Users size={18} />
-                            <span>Gerir Usuários</span>
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* CONTENT AREA */}
@@ -620,8 +589,6 @@ const SettingsPanel: React.FC = () => {
 
                 {/* --- TAB: HEADER & BRAND --- */}
                 {activeTab === 'HEADER' && (
-                    // ... (UNCHANGED CODE FOR HEADER)
-                    // (Retained for brevity, assume content is same as original except this comment)
                     <div className="space-y-6 max-w-4xl mx-auto">
                         <SectionHeader title="Cabeçalho & Identidade Visual" desc="Personalize o título, cores e logo que aparecem no topo da tela." />
                         
@@ -812,10 +779,9 @@ const SettingsPanel: React.FC = () => {
                     </div>
                 )}
                 
-                {/* --- TAB: LAYOUT & MEDIA --- */}
+                {/* --- TAB: LAYOUT & MEDIA (Combined/Optimized) --- */}
                 {activeTab === 'MEDIA' && (
                     <div className="space-y-6 max-w-5xl mx-auto h-full flex flex-col">
-                        {/* (UNCHANGED CODE FOR MEDIA TAB) */}
                          <SectionHeader title="Gerenciador de Janelas & Mídia" desc="Crie janelas flutuantes (PIP) e gerencie o conteúdo de cada uma." />
 
                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
@@ -1036,7 +1002,6 @@ const SettingsPanel: React.FC = () => {
 
                 {/* --- TAB: PARTY MODE --- */}
                 {activeTab === 'PARTY' && (
-                    // ... (UNCHANGED PARTY CODE)
                     <div className="space-y-8 max-w-4xl mx-auto">
                         <SectionHeader title="Modo Festa & Comemoração" desc="Ative efeitos visuais especiais para celebrar metas batidas ou eventos." />
 
@@ -1057,16 +1022,84 @@ const SettingsPanel: React.FC = () => {
                                 <Toggle checked={layout.isPartyMode} onChange={() => updateLayout({ isPartyMode: !layout.isPartyMode })} color="purple" />
                              </div>
                         </div>
-                        {/* ... Rest of Party UI ... */}
+
+                        {/* CONFIG GRID */}
+                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 transition-opacity duration-300 ${!layout.isPartyMode ? 'opacity-50 pointer-events-none grayscale' : 'opacity-100'}`}>
+                            {/* Message Config */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-white uppercase border-b border-white/5 pb-2">Mensagem do Banner</h4>
+                                <div>
+                                    <label className="label-pro">Texto de Celebração</label>
+                                    <input 
+                                        className="input-pro border-purple-500/30 focus:border-purple-500 font-bold text-lg text-purple-200 bg-purple-900/10"
+                                        value={layout.partyMessage || ''}
+                                        onChange={(e) => updateLayout({ partyMessage: e.target.value })}
+                                        placeholder="EX: META BATIDA! PARABÉNS TIME!"
+                                    />
+                                </div>
+                                
+                                {/* Custom Image Upload */}
+                                <div className="pt-4">
+                                    <h4 className="text-sm font-bold text-white uppercase border-b border-white/5 pb-2 mb-4">Imagem Personalizada (Partícula)</h4>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="w-24 h-24 bg-black rounded-lg border border-purple-500/30 flex items-center justify-center relative overflow-hidden group">
+                                            {layout.customPartyImage ? (
+                                                <img src={layout.customPartyImage} className="w-full h-full object-contain p-2" />
+                                            ) : (
+                                                <ImageIcon className="text-purple-500/30" />
+                                            )}
+                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                 <label className="cursor-pointer p-2 text-white hover:text-purple-400">
+                                                    <Upload size={20} />
+                                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && processImage(e.target.files[0], true, 'PARTY')} />
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 text-xs text-zinc-400">
+                                            <p className="mb-2">Faça upload de uma imagem (ex: foto do funcionário do mês, logo de um cliente) para usar como chuva de partículas.</p>
+                                            <p className="text-purple-400 font-bold">O fundo será removido automaticamente.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Effect Selector Grid */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-white uppercase border-b border-white/5 pb-2">Escolha o Efeito Visual</h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[
+                                        { id: 'CONFETTI', label: 'Confetes', icon: <PartyPopper size={18}/>, desc: 'Coloridos' },
+                                        { id: 'BUBBLES', label: 'Bolhas', icon: <Wind size={18}/>, desc: 'Cervejaria' },
+                                        { id: 'DISCO', label: 'Disco', icon: <Disc size={18}/>, desc: 'Luzes Strobo' },
+                                        { id: 'GLOW', label: 'Neon', icon: <Sparkles size={18}/>, desc: 'Brilho Suave' },
+                                        { id: 'WORLDCUP', label: 'Brasil', icon: <Flag size={18}/>, desc: 'Verde/Amarelo' },
+                                        { id: 'OLYMPICS', label: 'Olimpíadas', icon: <Medal size={18}/>, desc: 'Anéis' },
+                                        { id: 'BIRTHDAY', label: 'Aniversário', icon: <Cake size={18}/>, desc: 'Balões' },
+                                        { id: 'BONUS', label: 'Bônus', icon: <Banknote size={18}/>, desc: 'Chuva de $' },
+                                        { id: 'GOAL', label: 'Meta', icon: <Trophy size={18}/>, desc: 'Estrelas/Taças' },
+                                        { id: 'CUSTOM', label: 'Custom', icon: <ImageIcon size={18}/>, desc: 'Sua Imagem' },
+                                    ].map(eff => (
+                                        <EffectCard 
+                                            key={eff.id}
+                                            active={layout.partyEffect === eff.id}
+                                            onClick={() => updateLayout({ partyEffect: eff.id as any })}
+                                            icon={eff.icon}
+                                            label={eff.label}
+                                            description={eff.desc}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* --- TAB: API CONNECTION --- */}
                 {activeTab === 'API' && (
-                    // ... (UNCHANGED API CODE)
                     <div className="space-y-6 max-w-4xl mx-auto">
                         <SectionHeader title="Conexão Industrial" desc="Gerencie a conexão MQTT e mapeie as tags de dados para cada linha." />
-                         {/* API Sub-Navigation */}
+                        
+                        {/* API Sub-Navigation */}
                         <div className="flex bg-black/40 p-1 rounded-lg border border-brewery-border mb-6 w-fit">
                             <button 
                                 onClick={() => setApiSubTab('CONNECTION')}
@@ -1081,26 +1114,570 @@ const SettingsPanel: React.FC = () => {
                                 <Tags size={16} /> Mapeamento de Tags
                             </button>
                         </div>
-                         {/* ... Rest of API UI ... */}
+
+                        {apiSubTab === 'CONNECTION' && (
+                            <div className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden animate-in fade-in slide-in-from-left-4 duration-300">
+                                {/* Visual Connection Status Header */}
+                                <div className="bg-black/40 p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all duration-500 ${
+                                            connectionStatus === 'CONNECTED' ? 'bg-emerald-900/20 border-emerald-500 text-emerald-500 shadow-emerald-900/40' :
+                                            connectionStatus === 'CONNECTING' ? 'bg-blue-900/20 border-blue-500 text-blue-500 animate-pulse' :
+                                            'bg-rose-900/20 border-rose-500 text-rose-500'
+                                        }`}>
+                                            {connectionStatus === 'CONNECTED' ? <Wifi size={32} /> : 
+                                             connectionStatus === 'CONNECTING' ? <RefreshCw size={32} className="animate-spin" /> : 
+                                             <Wifi size={32} className="opacity-50" />}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                                                {connectionStatus === 'CONNECTED' ? 'ONLINE' : 
+                                                 connectionStatus === 'CONNECTING' ? 'CONECTANDO...' : 'OFFLINE'}
+                                            </h3>
+                                            <div className="flex items-center gap-4 mt-1">
+                                                <div className="flex items-center gap-1.5 text-xs font-mono text-brewery-muted">
+                                                    <Server size={12} />
+                                                    {connectionConfig.protocol}://{connectionConfig.host}:{connectionConfig.port}
+                                                </div>
+                                                {connectionStatus === 'CONNECTED' && (
+                                                    <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-400">
+                                                        <Activity size={12} />
+                                                        {ping}ms
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                         <button 
+                                            onClick={handleTestConnection}
+                                            disabled={testStatus === 'TESTING'}
+                                            className={`px-6 py-3 rounded-lg font-bold border transition-all flex items-center gap-2 uppercase tracking-wider text-sm ${
+                                                testStatus === 'SUCCESS' ? 'bg-emerald-500 text-black border-emerald-500' : 
+                                                testStatus === 'ERROR' ? 'bg-rose-500 text-white border-rose-500' : 
+                                                'bg-white/10 border-white/10 text-white hover:bg-white/20'
+                                            }`}
+                                        >
+                                            {testStatus === 'TESTING' ? <RefreshCw className="animate-spin" size={16} /> : 
+                                            testStatus === 'SUCCESS' ? <CheckCircle size={16} /> : 
+                                            testStatus === 'ERROR' ? <AlertTriangle size={16} /> : 
+                                            <ArrowRightLeft size={16} />}
+                                            <span>Testar Ping</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        <div className="col-span-1">
+                                            <label className="label-pro">Protocolo</label>
+                                            <select 
+                                                className="input-pro"
+                                                value={connectionConfig.protocol}
+                                                onChange={(e) => updateConnectionConfig({ protocol: e.target.value as 'ws' | 'wss' })}
+                                            >
+                                                <option value="ws">WS:// (Padrão)</option>
+                                                <option value="wss">WSS:// (Seguro)</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-span-1 md:col-span-3">
+                                            <label className="label-pro">Host / IP do Broker</label>
+                                            <div className="relative">
+                                                <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brewery-muted"/>
+                                                <input 
+                                                    className="input-pro !pl-9 font-mono"
+                                                    placeholder="localhost ou 192.168.1.50"
+                                                    value={connectionConfig.host}
+                                                    onChange={(e) => updateConnectionConfig({ host: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        <div className="col-span-1">
+                                            <label className="label-pro">Porta</label>
+                                            <div className="relative">
+                                                <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brewery-muted"/>
+                                                <input 
+                                                    className="input-pro !pl-9 font-mono"
+                                                    placeholder="1880"
+                                                    value={connectionConfig.port}
+                                                    onChange={(e) => updateConnectionConfig({ port: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="col-span-1 md:col-span-3">
+                                            <label className="label-pro">Topic / Path (Rota WebSocket)</label>
+                                            <div className="relative">
+                                                <Network size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brewery-muted"/>
+                                                <input 
+                                                    className="input-pro !pl-9 font-mono"
+                                                    placeholder="/ws/brewery-data"
+                                                    value={connectionConfig.path}
+                                                    onChange={(e) => updateConnectionConfig({ path: e.target.value })}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-brewery-muted mt-2 flex items-center gap-1">
+                                                <Info size={10} /> O endpoint deve suportar conexão WebSocket.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <Toggle checked={connectionConfig.autoConnect} onChange={() => updateConnectionConfig({ autoConnect: !connectionConfig.autoConnect })} />
+                                            <div>
+                                                <span className="text-sm font-bold text-white block">Conexão Automática</span>
+                                                <span className="text-xs text-brewery-muted">Reconectar ao iniciar ou em caso de queda.</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-[10px] text-zinc-500 font-mono">
+                                            Client ID: IV-PRO-{Math.floor(Math.random()*1000)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {apiSubTab === 'TAGS' && (
+                             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg flex items-start gap-3">
+                                    <Info size={18} className="text-blue-400 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="text-sm text-blue-200 font-bold">Dicionário de Dados</p>
+                                        <p className="text-xs text-blue-300/70 mt-1">Defina o caminho JSON (ex: <code className="bg-black/30 px-1 rounded">payload.temp</code>) para cada variável de cada equipamento. Use o Terminal abaixo para ver a estrutura dos dados recebidos.</p>
+                                    </div>
+                                </div>
+
+                                {lineConfigs.map((line) => (
+                                    <div key={line.id} className="bg-brewery-card border border-brewery-border rounded-lg overflow-hidden">
+                                        <div className="bg-black/20 p-3 border-b border-white/5 flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center text-brewery-muted text-xs font-bold border border-white/10">
+                                                {line.id.substring(0,3)}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white">{line.name}</h4>
+                                                <span className="text-[10px] text-brewery-muted font-mono">{line.id}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Database size={10} /> Volume (Total)</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-emerald-400/90 bg-black/40 border-white/5 focus:border-emerald-500/50" 
+                                                        value={line.dataMapping?.productionKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, productionKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Gauge size={10} /> Velocidade</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-blue-400/90 bg-black/40 border-white/5 focus:border-blue-500/50" 
+                                                        value={line.dataMapping?.speedKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, speedKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Activity size={10} /> Temperatura</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-amber-400/90 bg-black/40 border-white/5 focus:border-amber-500/50" 
+                                                        value={line.dataMapping?.temperatureKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, temperatureKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Zap size={10} /> Eficiência/OEE</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-purple-400/90 bg-black/40 border-white/5 focus:border-purple-500/50" 
+                                                        value={line.dataMapping?.efficiencyKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, efficiencyKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] uppercase font-bold text-brewery-muted flex items-center gap-1"><Info size={10} /> Status (String)</label>
+                                                <div className="relative">
+                                                    <FileJson size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-brewery-muted opacity-50"/>
+                                                    <input 
+                                                        className="input-pro !pl-7 py-1.5 text-xs font-mono text-zinc-300/90 bg-black/40 border-white/5 focus:border-zinc-500/50" 
+                                                        value={line.dataMapping?.statusKey || ''}
+                                                        onChange={(e) => updateLine(line.id, { dataMapping: { ...line.dataMapping!, statusKey: e.target.value } })}
+                                                        placeholder="key"
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Visibility Toggle Shortcuts */}
+                                            <div className="flex items-end pb-1 gap-2">
+                                                <button 
+                                                    onClick={() => updateLine(line.id, { display: { ...line.display, showTemp: !line.display.showTemp } })}
+                                                    className={`p-1.5 rounded border transition-colors ${line.display.showTemp ? 'bg-amber-500/20 border-amber-500 text-amber-500' : 'bg-black/20 border-white/5 text-zinc-600'}`}
+                                                    title="Toggle Temp Visibility"
+                                                >
+                                                    <Activity size={14} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => updateLine(line.id, { display: { ...line.display, showVolume: !line.display.showVolume } })}
+                                                    className={`p-1.5 rounded border transition-colors ${line.display.showVolume ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500' : 'bg-black/20 border-white/5 text-zinc-600'}`}
+                                                    title="Toggle Volume Visibility"
+                                                >
+                                                    <Database size={14} />
+                                                </button>
+                                                <div className="text-[9px] text-zinc-600 self-center ml-1">Visibilidade Rápida</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                             </div>
+                        )}
+
+                        {/* --- DEBUG TERMINAL (ALWAYS VISIBLE IN API TAB) --- */}
+                        <div className="bg-[#0c0c0c] border border-white/10 rounded-lg overflow-hidden shadow-2xl flex flex-col h-80 animate-in slide-in-from-bottom-4 fade-in">
+                            {/* Terminal Header */}
+                            <div className="flex justify-between items-center p-2 bg-white/5 border-b border-white/10">
+                                <div className="flex items-center gap-2 text-xs font-mono font-bold text-brewery-muted px-2">
+                                    <Terminal size={14} className="text-brewery-accent" />
+                                    <span>Terminal de Telemetria (Live)</span>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button 
+                                        onClick={() => setIsLogPaused(!isLogPaused)} 
+                                        className={`p-1.5 rounded transition-colors ${isLogPaused ? 'bg-amber-500/20 text-amber-500' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
+                                        title={isLogPaused ? "Resume" : "Pause"}
+                                    >
+                                        {isLogPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />}
+                                    </button>
+                                    <button 
+                                        onClick={() => setConsoleLogs([])} 
+                                        className="p-1.5 rounded text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                        title="Clear Console"
+                                    >
+                                        <Eraser size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Terminal Body */}
+                            <div className="flex-1 overflow-y-auto p-3 font-mono text-[10px] md:text-xs custom-scrollbar">
+                                {consoleLogs.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-2 opacity-50">
+                                        <Bug size={32} />
+                                        <p>Aguardando dados...</p>
+                                    </div>
+                                ) : (
+                                    consoleLogs.map((log, i) => (
+                                        <div key={i} className="mb-1 border-b border-white/5 pb-1 break-all last:border-0 hover:bg-white/5 transition-colors px-1 rounded">
+                                            <span className="text-zinc-500 select-none mr-2">[{log.time}]</span>
+                                            {log.data.error ? (
+                                                <span className="text-rose-500 font-bold">
+                                                    ERROR: {log.data.error}
+                                                    <span className="block text-rose-300/50 pl-4 text-[9px]">{typeof log.data.raw === 'string' ? log.data.raw : JSON.stringify(log.data.raw)}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-emerald-400/90">
+                                                    {JSON.stringify(log.data)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                                <div ref={logsEndRef} />
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* --- TAB: ALERTS (AVISOS GERAIS) --- */}
                 {activeTab === 'ALERTS' && (
-                     // ... (UNCHANGED ALERTS CODE)
-                     <div className="space-y-6 max-w-4xl mx-auto">
+                    <div className="space-y-6 max-w-4xl mx-auto">
+                        {/* ... (Existing Alerts Code) ... */}
                          <SectionHeader title="Avisos Gerais" desc="Crie comunicados para o rodapé (Ticker) ou alertas de tela cheia." />
-                         {/* ... Rest of Alerts UI ... */}
-                     </div>
+                         
+                         {/* ALERT CREATION CARD */}
+                         <div className="bg-brewery-card/50 border border-brewery-border rounded-xl p-6 space-y-6 shadow-xl backdrop-blur-sm">
+                            
+                            {/* 1. TYPE SELECTION (VISUAL BUTTONS) */}
+                            <div>
+                                <label className="label-pro mb-3">Selecione o Tipo de Alerta</label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {[
+                                        { type: 'INFO', label: 'Info', icon: <Info size={20} />, color: 'blue', border: 'border-blue-500', bg: 'bg-blue-500' },
+                                        { type: 'ATTENTION', label: 'Comunicado', icon: <Megaphone size={20} />, color: 'orange', border: 'border-orange-500', bg: 'bg-orange-500' },
+                                        { type: 'WARNING', label: 'Atenção', icon: <AlertTriangle size={20} />, color: 'amber', border: 'border-amber-500', bg: 'bg-amber-500' },
+                                        { type: 'CRITICAL', label: 'Crítico', icon: <AlertOctagon size={20} />, color: 'rose', border: 'border-rose-500', bg: 'bg-rose-500' },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.type}
+                                            onClick={() => setNewType(opt.type as AnnouncementType)}
+                                            className={`
+                                                relative p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all duration-200
+                                                ${newType === opt.type 
+                                                    ? `${opt.bg}/20 ${opt.border} text-white shadow-[0_0_15px_rgba(0,0,0,0.5)] ring-1 ring-white/20` 
+                                                    : 'bg-black/40 border-white/5 text-brewery-muted hover:bg-white/5 hover:border-white/20'
+                                                }
+                                            `}
+                                        >
+                                            <div className={`${newType === opt.type ? `text-${opt.color}-400` : ''}`}>
+                                                {opt.icon}
+                                            </div>
+                                            <span className="font-bold text-xs uppercase tracking-wider">{opt.label}</span>
+                                            {newType === opt.type && <div className={`absolute inset-0 rounded-xl bg-${opt.color}-500/5`} />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 2. MESSAGE INPUT */}
+                            <div>
+                                <label className="label-pro">Mensagem do Aviso</label>
+                                <textarea 
+                                    className="input-pro h-24 font-bold text-lg resize-none leading-relaxed" 
+                                    placeholder="Digite a mensagem que será exibida..." 
+                                    value={newMsg}
+                                    onChange={(e) => setNewMsg(e.target.value)}
+                                    maxLength={140}
+                                />
+                                <div className="flex justify-between mt-1 px-1">
+                                    <span className="text-[10px] text-brewery-muted">Suporta emojis ⚠️ 🔥</span>
+                                    <span className="text-[10px] text-brewery-muted font-mono">{newMsg.length}/140</span>
+                                </div>
+                            </div>
+
+                            {/* 3. MODE & SCHEDULE GRID */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-black/20 rounded-xl border border-white/5">
+                                {/* Mode Toggle */}
+                                <div className="space-y-3">
+                                    <label className="label-pro flex items-center gap-2"><Monitor size={14}/> Modo de Exibição</label>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => setIsOverlay(false)}
+                                            className={`flex-1 p-3 rounded-lg border text-xs font-bold uppercase transition-all flex flex-col items-center gap-2 ${!isOverlay ? 'bg-brewery-accent/20 border-brewery-accent text-white' : 'bg-black/40 border-white/10 text-brewery-muted'}`}
+                                        >
+                                            <Rss size={18} />
+                                            Rodapé (Ticker)
+                                        </button>
+                                        <button 
+                                            onClick={() => setIsOverlay(true)}
+                                            className={`flex-1 p-3 rounded-lg border text-xs font-bold uppercase transition-all flex flex-col items-center gap-2 ${isOverlay ? 'bg-rose-500/20 border-rose-500 text-white' : 'bg-black/40 border-white/10 text-brewery-muted'}`}
+                                        >
+                                            <Maximize size={18} />
+                                            Tela Cheia
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-brewery-muted leading-tight">
+                                        {isOverlay 
+                                            ? "Interrompe a visualização com um alerta pop-up no centro da tela." 
+                                            : "Passa uma mensagem contínua na barra inferior sem interromper."}
+                                    </p>
+                                </div>
+
+                                {/* Scheduling */}
+                                <div className="space-y-3 border-l border-white/10 pl-0 md:pl-6">
+                                     <label className="label-pro flex items-center gap-2"><CalendarClock size={14}/> Agendamento (Opcional)</label>
+                                     <div className="grid grid-cols-1 gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-brewery-muted w-8">Início</span>
+                                            <input 
+                                                type="datetime-local" 
+                                                className="input-pro py-1 text-xs bg-black border-white/10"
+                                                value={scheduleStart}
+                                                onChange={(e) => setScheduleStart(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-brewery-muted w-8">Fim</span>
+                                            <input 
+                                                type="datetime-local" 
+                                                className="input-pro py-1 text-xs bg-black border-white/10"
+                                                value={scheduleEnd}
+                                                onChange={(e) => setScheduleEnd(e.target.value)}
+                                            />
+                                        </div>
+                                     </div>
+                                </div>
+                            </div>
+                            
+                            {/* ACTION BUTTON */}
+                            <div className="flex justify-end pt-2">
+                                <button 
+                                    onClick={() => {
+                                        if (newMsg) {
+                                            addAnnouncement({
+                                                id: Date.now().toString(),
+                                                message: newMsg,
+                                                type: newType,
+                                                isActive: true,
+                                                displayMode: isOverlay ? 'OVERLAY' : 'TICKER',
+                                                schedule: (scheduleStart || scheduleEnd) ? {
+                                                    start: scheduleStart || undefined,
+                                                    end: scheduleEnd || undefined
+                                                } : undefined
+                                            });
+                                            setNewMsg('');
+                                            setScheduleStart('');
+                                            setScheduleEnd('');
+                                            setIsOverlay(false);
+                                        }
+                                    }} 
+                                    disabled={!newMsg}
+                                    className="btn-primary px-8 h-12 shadow-lg shadow-amber-900/20 w-full md:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Megaphone size={18} className="mr-2" /> Publicar Aviso no Painel
+                                </button>
+                            </div>
+                         </div>
+
+                         {/* LIST OF ALERTS */}
+                         <div className="space-y-4 pt-4">
+                            <h3 className="text-xs font-bold text-brewery-muted uppercase tracking-widest flex items-center gap-2"><List size={14}/> Avisos Ativos ({announcements.length})</h3>
+                            
+                            {announcements.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-12 bg-black/20 rounded-xl border border-dashed border-brewery-border text-brewery-muted">
+                                    <Bell size={40} className="mb-3 opacity-20" />
+                                    <p>Nenhum aviso configurado no momento.</p>
+                                </div>
+                            )}
+
+                            <div className="grid gap-3">
+                                {announcements.map(item => (
+                                    <div key={item.id} className="bg-brewery-card border border-brewery-border p-4 rounded-xl flex items-center justify-between group hover:border-brewery-accent/40 transition-all shadow-sm">
+                                        <div className="flex items-center gap-5 overflow-hidden">
+                                            {/* Type Icon Indicator */}
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 border-2 ${
+                                                item.type === 'CRITICAL' ? 'bg-rose-900/30 border-rose-500 text-rose-500' : 
+                                                item.type === 'WARNING' ? 'bg-amber-900/30 border-amber-500 text-amber-500' : 
+                                                item.type === 'ATTENTION' ? 'bg-orange-900/30 border-orange-500 text-orange-500' : 
+                                                'bg-blue-900/30 border-blue-500 text-blue-400'
+                                            }`}>
+                                                {item.type === 'CRITICAL' ? <AlertOctagon size={20} /> : 
+                                                 item.type === 'WARNING' ? <AlertTriangle size={20} /> :
+                                                 item.type === 'ATTENTION' ? <Megaphone size={20} /> : <Info size={20} />}
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-white text-lg leading-tight truncate">{item.message}</p>
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    <Badge text={item.type} color={
+                                                        item.type === 'CRITICAL' ? 'rose' : 
+                                                        item.type === 'WARNING' ? 'amber' : 
+                                                        item.type === 'ATTENTION' ? 'orange' : 'blue'
+                                                    }/>
+                                                    <Badge text={item.displayMode === 'OVERLAY' ? 'TELA CHEIA' : 'RODAPÉ'} />
+                                                    
+                                                    {(item.schedule?.start || item.schedule?.end) && (
+                                                        <div className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-black/40 text-brewery-muted border border-white/10 font-mono">
+                                                            <Clock size={10} />
+                                                            {item.schedule.start ? new Date(item.schedule.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Agora'}
+                                                            {' -> '}
+                                                            {item.schedule.end ? new Date(item.schedule.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Indefinido'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <button 
+                                            onClick={() => removeAnnouncement(item.id)}
+                                            className="p-3 bg-black/40 hover:bg-rose-950 text-brewery-muted hover:text-rose-500 rounded-lg transition-colors border border-white/5 hover:border-rose-500/30"
+                                            title="Remover Aviso"
+                                        >
+                                            <Trash2 size={20} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                         </div>
+                    </div>
                 )}
                 
                 {/* --- TAB: LAYOUT & INTERFACE (Optimized) --- */}
                 {activeTab === 'LAYOUT' && (
-                    // ... (UNCHANGED LAYOUT CODE)
                     <div className="space-y-8 max-w-3xl mx-auto">
                          <SectionHeader title="Layout & Interface" desc="Personalize a disposição dos painéis e elementos visuais." />
                          <div className="bg-brewery-card border border-brewery-border rounded-lg p-6 space-y-4">
-                            {/* ... Rest of Layout UI ... */}
+                            <div className="flex justify-between items-center p-3 bg-black/20 rounded border border-white/5">
+                                <div className="flex items-center gap-3">
+                                    <Monitor size={18} className="text-indigo-400" />
+                                    <div>
+                                        <span className="text-sm font-bold text-white block">Painel de Mídia (PIP)</span>
+                                        <span className="text-xs text-brewery-muted">Ativar/Desativar todas as janelas flutuantes globalmente.</span>
+                                    </div>
+                                </div>
+                                <Toggle checked={layout.showMediaPanel} onChange={() => updateLayout({ showMediaPanel: !layout.showMediaPanel })} />
+                            </div>
+                            
+                            <div className="flex justify-between items-center p-3 bg-black/20 rounded border border-white/5">
+                                <div className="flex items-center gap-3">
+                                    <Rss size={18} className="text-orange-400" />
+                                    <div>
+                                        <span className="text-sm font-bold text-white block">Ticker de Notícias (Rodapé)</span>
+                                        <span className="text-xs text-brewery-muted">Exibir barra de rolagem de avisos na parte inferior.</span>
+                                    </div>
+                                </div>
+                                <Toggle checked={layout.showTicker} onChange={() => updateLayout({ showTicker: !layout.showTicker })} />
+                            </div>
+
+                            {layout.showTicker && (
+                                <div className="px-3 space-y-4 pt-2">
+                                    <div>
+                                        <label className="label-pro flex justify-between">
+                                            <span>Velocidade do Ticker</span>
+                                            <span className="text-indigo-400">{layout.tickerSpeed}s</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="10" max="100" step="5" 
+                                            className="w-full accent-indigo-500"
+                                            value={layout.tickerSpeed}
+                                            onChange={(e) => updateLayout({ tickerSpeed: parseInt(e.target.value) })}
+                                        />
+                                        <p className="text-[10px] text-zinc-500 mt-1">Quanto menor o valor, mais rápido o texto passa.</p>
+                                    </div>
+                                    <div>
+                                        <label className="label-pro flex justify-between">
+                                            <span>Altura da Barra (px)</span>
+                                            <span className="text-indigo-400">{layout.tickerHeight || 60}px</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="30" max="150" step="5" 
+                                            className="w-full accent-indigo-500"
+                                            value={layout.tickerHeight || 60}
+                                            onChange={(e) => updateLayout({ tickerHeight: parseInt(e.target.value) })}
+                                        />
+                                    </div>
+                                    {/* NEW: Font Size Control */}
+                                    <div>
+                                        <label className="label-pro flex justify-between">
+                                            <span>Tamanho da Fonte (px)</span>
+                                            <span className="text-indigo-400">{layout.tickerFontSize || 18}px</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="12" max="72" step="2" 
+                                            className="w-full accent-indigo-500"
+                                            value={layout.tickerFontSize || 18}
+                                            onChange={(e) => updateLayout({ tickerFontSize: parseInt(e.target.value) })}
+                                        />
+                                        <p className="text-[10px] text-zinc-500 mt-1">Aumente ou diminua o texto das mensagens.</p>
+                                    </div>
+                                </div>
+                            )}
                          </div>
                     </div>
                 )}
