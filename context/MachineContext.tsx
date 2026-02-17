@@ -24,7 +24,13 @@ const INITIAL_LAYOUT: LayoutSettings = {
         alignment: 'LEFT'
     },
     logoWidget: { show: true, x: 20, y: 20, w: 120, h: 120, url: '' },
-    floatingWindows: [{ id: 'floating', name: 'Principal', x: 800, y: 350, w: 400, h: 300 }],
+    // Fixed 4 Windows configuration
+    floatingWindows: [
+        { id: 'win-1', name: 'Janela 01', x: 50, y: 150, w: 400, h: 300, visible: true },
+        { id: 'win-2', name: 'Janela 02', x: 500, y: 150, w: 400, h: 300, visible: false },
+        { id: 'win-3', name: 'Janela 03', x: 950, y: 150, w: 400, h: 300, visible: false },
+        { id: 'win-4', name: 'Janela 04', x: 50, y: 500, w: 400, h: 300, visible: false },
+    ],
     areWindowsLocked: false,
     widgetSize: 'NORMAL',
     showMediaPanel: true,
@@ -35,7 +41,8 @@ const INITIAL_LAYOUT: LayoutSettings = {
     tickerSpeed: 30,
     isPartyMode: false,
     partyMessage: 'FESTA DA CERVEJA! 🍻',
-    partyEffect: 'BUBBLES'
+    partyEffect: 'BUBBLES',
+    customPartyRemoveBg: false
 };
 
 const INITIAL_CONNECTION: ConnectionSettings = {
@@ -55,7 +62,15 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [layout, setLayoutState] = useState<LayoutSettings>(() => {
     const saved = localStorage.getItem('IV_LAYOUT');
-    return saved ? JSON.parse(saved) : INITIAL_LAYOUT;
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        // Ensure 4 windows exist even if loading from old save
+        if (!parsed.floatingWindows || parsed.floatingWindows.length !== 4) {
+            parsed.floatingWindows = INITIAL_LAYOUT.floatingWindows;
+        }
+        return parsed;
+    }
+    return INITIAL_LAYOUT;
   });
 
   const [connectionConfig, setConnectionConfigState] = useState<ConnectionSettings>(() => {
@@ -65,10 +80,14 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [playlists, setPlaylists] = useState<Record<string, MediaItem[]>>(() => {
      const saved = localStorage.getItem('IV_PLAYLISTS');
-     // Ensure 'floating' and 'banner' keys exist for robustness
-     const parsed = saved ? JSON.parse(saved) : { 'floating': DEFAULT_MEDIA };
+     const parsed = saved ? JSON.parse(saved) : {};
+     
+     // Ensure keys exist for banner and all 4 windows
      if (!parsed.banner) parsed.banner = [];
-     if (!parsed.floating) parsed.floating = [];
+     ['win-1', 'win-2', 'win-3', 'win-4'].forEach(key => {
+         if (!parsed[key]) parsed[key] = key === 'win-1' ? DEFAULT_MEDIA : [];
+     });
+     
      return parsed;
   });
 
@@ -189,25 +208,21 @@ export const MachineProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addAnnouncement = (item: Announcement) => setAnnouncements(prev => [...prev, item]);
   const removeAnnouncement = (id: string) => setAnnouncements(prev => prev.filter(a => a.id !== id));
 
+  // Disabled in UI, but kept for type safety or programmatic use if needed (logic updated to block >4)
   const addWindow = (name: string) => {
-      const newId = `win-${Date.now()}`;
-      setLayoutState(prev => ({
-          ...prev,
-          floatingWindows: [...prev.floatingWindows, { id: newId, name, x: 200, y: 200, w: 400, h: 300 }]
-      }));
-      setPlaylists(prev => ({ ...prev, [newId]: [] }));
+      if (layout.floatingWindows.length >= 4) return;
+      // ... logic omitted as UI removed ...
   };
+  
   const updateWindow = (id: string, config: Partial<FloatingWindowConfig>) => {
       setLayoutState(prev => ({
           ...prev,
           floatingWindows: prev.floatingWindows.map(w => w.id === id ? { ...w, ...config } : w)
       }));
   };
+  
   const removeWindow = (id: string) => {
-      setLayoutState(prev => ({
-          ...prev,
-          floatingWindows: prev.floatingWindows.filter(w => w.id !== id)
-      }));
+      // Disabled in UI - Fixed 4 windows
   };
 
   const value: MachineContextType = {

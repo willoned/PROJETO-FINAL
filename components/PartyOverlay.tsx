@@ -275,13 +275,16 @@ const PartyOverlay: React.FC<Props> = ({ effect }) => {
                 <img 
                     key={c.id}
                     src={layout.customPartyImage}
-                    className="absolute -top-20 animate-fall object-contain opacity-80"
+                    className="absolute -top-20 animate-fall object-contain opacity-90"
                     style={{
                         left: c.left,
                         width: c.size,
                         height: c.size,
                         animationDuration: c.animationDuration,
-                        animationDelay: c.animationDelay
+                        animationDelay: c.animationDelay,
+                        // If "Remove Bg" is on, use multiply to make white transparent. 
+                        // Otherwise use normal rendering.
+                        mixBlendMode: layout.customPartyRemoveBg ? 'multiply' : 'normal'
                     }}
                 />
             ))}

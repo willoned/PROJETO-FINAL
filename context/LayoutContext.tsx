@@ -43,7 +43,7 @@ const initialState: LayoutState = {
         alignment: 'LEFT'
     },
     logoWidget: { show: true, x: 20, y: 20, w: 120, h: 120, url: '' },
-    floatingWindows: [{ id: 'floating', name: 'Principal', x: 800, y: 350, w: 400, h: 300 }],
+    floatingWindows: [{ id: 'floating', name: 'Principal', x: 800, y: 350, w: 400, h: 300, visible: true }],
     areWindowsLocked: false,
     widgetSize: 'NORMAL',
     showMediaPanel: true,
@@ -122,7 +122,7 @@ function layoutReducer(state: LayoutState, action: Action): LayoutState {
         }
         case 'ADD_WINDOW': {
              const newId = `window-${Date.now()}`;
-             return { ...state, layout: { ...state.layout, floatingWindows: [...state.layout.floatingWindows, { id: newId, name: action.payload.name, x: 100, y: 100, w: 400, h: 300 }] }, playlists: { ...state.playlists, [newId]: [] } };
+             return { ...state, layout: { ...state.layout, floatingWindows: [...state.layout.floatingWindows, { id: newId, name: action.payload.name, x: 100, y: 100, w: 400, h: 300, visible: true }] }, playlists: { ...state.playlists, [newId]: [] } };
         }
         case 'REMOVE_WINDOW': return { ...state, layout: { ...state.layout, floatingWindows: state.layout.floatingWindows.filter(w => w.id !== action.payload) } };
         case 'UPDATE_WINDOW': return { ...state, layout: { ...state.layout, floatingWindows: state.layout.floatingWindows.map(w => w.id === action.payload.id ? { ...w, ...action.payload.config } : w) } };

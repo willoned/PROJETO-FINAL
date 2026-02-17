@@ -5,7 +5,8 @@ import {
   X, Trash2, LayoutTemplate, Factory, Database, Monitor, Bell, 
   Settings as SettingsIcon, PartyPopper, Type, Plus, Image, Video, Globe, 
   AlertTriangle, AlertOctagon, Info, User as UserIcon, Lock, Users, LogOut, CheckSquare, Square,
-  Maximize, Move, Type as TypeIcon, Hash, Beer, AlignLeft, AlignCenter, Minus, Upload
+  Maximize, Move, Type as TypeIcon, Hash, Beer, AlignLeft, AlignCenter, Minus, Upload, Eye, EyeOff,
+  Calendar, Clock as ClockIcon
 } from 'lucide-react';
 import { MediaType, AnnouncementType, MediaItem, PermissionTab, UserRole, PartyEffect } from '../types';
 
@@ -14,7 +15,7 @@ const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.Re
     onClick={onClick}
     className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all text-sm font-bold ${
       active
-        ? 'bg-gradient-to-r from-brewery-accent to-amber-600 text-black shadow-lg shadow-amber-900/20'
+        ? 'bg-brewery-accent text-black shadow-lg shadow-amber-900/20'
         : 'text-zinc-400 hover:bg-white/5 hover:text-white'
     }`}
   >
@@ -24,14 +25,14 @@ const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.Re
 );
 
 const SectionHeader: React.FC<{ title: string; desc: string }> = ({ title, desc }) => (
-  <div className="mb-8 border-b border-white/10 pb-4">
+  <div className="mb-8 border-b border-brewery-border pb-4">
     <h2 className="text-3xl font-black text-white tracking-tight uppercase">{title}</h2>
     <p className="text-zinc-400 mt-2 text-sm">{desc}</p>
   </div>
 );
 
 const Toggle: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
-  <div className="flex items-center justify-between bg-zinc-900/50 p-4 rounded-xl border border-white/5 hover:border-white/10 transition-colors cursor-pointer" onClick={() => onChange(!checked)}>
+  <div className="flex items-center justify-between bg-zinc-900/50 p-4 rounded-xl border border-brewery-border hover:border-white/10 transition-colors cursor-pointer" onClick={() => onChange(!checked)}>
     <span className="font-bold text-zinc-300 text-sm">{label}</span>
     <button 
       type="button"
@@ -45,7 +46,7 @@ const Toggle: React.FC<{ label: string; checked: boolean; onChange: (v: boolean)
 const NumberInput: React.FC<{ label: string; value: number; onChange: (val: number) => void; min?: number; max?: number }> = ({ label, value, onChange, min, max }) => (
   <div className="flex flex-col gap-1">
     <label className="text-[10px] uppercase font-bold text-zinc-500">{label}</label>
-    <div className="flex items-center bg-zinc-900 border border-white/10 rounded-lg px-2">
+    <div className="flex items-center bg-zinc-900 border border-brewery-border rounded-lg px-2">
       <input 
         type="number" 
         className="w-full bg-transparent py-2 text-white font-mono text-sm focus:outline-none"
@@ -86,19 +87,15 @@ const SettingsPanel: React.FC = () => {
   const [newLineName, setNewLineName] = useState('');
   const [newMediaUrl, setNewMediaUrl] = useState('');
   const [newMediaType, setNewMediaType] = useState<MediaType>('IMAGE');
+  
+  // Alert State
   const [newAlertMsg, setNewAlertMsg] = useState('');
   const [newAlertType, setNewAlertType] = useState<AnnouncementType>('INFO');
+  const [newAlertStart, setNewAlertStart] = useState('');
+  const [newAlertEnd, setNewAlertEnd] = useState('');
+
   const [newWindowName, setNewWindowName] = useState('');
-  const [windowToDelete, setWindowToDelete] = useState('');
 
-  // Sync windowToDelete state: if the selected window doesn't exist anymore, clear selection
-  useEffect(() => {
-    if (windowToDelete && !layout.floatingWindows.find(w => w.id === windowToDelete)) {
-      setWindowToDelete('');
-    }
-  }, [layout.floatingWindows, windowToDelete]);
-
-  // Map PermissionEnum to Display String (Portuguese)
   const PERMISSION_LABELS: Record<PermissionTab, string> = {
     LINES: 'Linhas de Produção',
     MEDIA: 'Mídia & Menu',
@@ -107,6 +104,19 @@ const SettingsPanel: React.FC = () => {
     HEADER: 'Cabeçalho',
     PARTY: 'Modo Festa',
     API: 'Conexão Node-RED'
+  };
+
+  const PARTY_EFFECT_LABELS: Record<PartyEffect, string> = {
+    GLOW: 'BRILHO NEON',
+    CONFETTI: 'CHUVA DE CONFETE',
+    BUBBLES: 'BOLHAS DE CERVEJA',
+    DISCO: 'LUZES DE DISCOTECA',
+    WORLDCUP: 'CLIMA DE COPA',
+    OLYMPICS: 'ESPÍRITO OLÍMPICO',
+    BIRTHDAY: 'ANIVERSÁRIO',
+    BONUS: 'CHUVA DE DINHEIRO',
+    GOAL: 'GOL DE PLACA',
+    CUSTOM: 'PERSONALIZADO (IMG/GIF)'
   };
 
   const getTabs = () => {
@@ -150,14 +160,14 @@ const SettingsPanel: React.FC = () => {
                         <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Usuário</label>
                         <div className="relative">
                             <UserIcon className="absolute left-3 top-2.5 text-zinc-500" size={18} />
-                            <input className="w-full bg-black/40 border border-white/10 rounded pl-10 pr-4 py-2 text-white focus:border-brewery-accent outline-none" value={loginUser} onChange={e => setLoginUser(e.target.value)} autoFocus />
+                            <input className="w-full bg-black/40 border border-brewery-border rounded pl-10 pr-4 py-2 text-white focus:border-brewery-accent outline-none" value={loginUser} onChange={e => setLoginUser(e.target.value)} autoFocus />
                         </div>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Senha</label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-2.5 text-zinc-500" size={18} />
-                            <input type="password" className="w-full bg-black/40 border border-white/10 rounded pl-10 pr-4 py-2 text-white focus:border-brewery-accent outline-none" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
+                            <input type="password" className="w-full bg-black/40 border border-brewery-border rounded pl-10 pr-4 py-2 text-white focus:border-brewery-accent outline-none" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
                         </div>
                     </div>
                     {loginError && <p className="text-rose-500 text-sm font-bold text-center">{loginError}</p>}
@@ -206,25 +216,32 @@ const SettingsPanel: React.FC = () => {
       }
   };
 
+  const handleCustomPartyFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          const file = e.target.files[0];
+          const url = URL.createObjectURL(file);
+          updateLayout({ customPartyImage: url });
+      }
+  };
+
   const handleAddAlert = () => {
       if (!newAlertMsg) return;
-      addAnnouncement({ id: Date.now().toString(), message: newAlertMsg, type: newAlertType, isActive: true, displayMode: newAlertType === 'CRITICAL' ? 'OVERLAY' : 'TICKER' });
+      
+      addAnnouncement({ 
+          id: Date.now().toString(), 
+          message: newAlertMsg, 
+          type: newAlertType, 
+          isActive: true, 
+          displayMode: newAlertType === 'CRITICAL' ? 'OVERLAY' : 'TICKER',
+          schedule: (newAlertStart || newAlertEnd) ? {
+              start: newAlertStart || undefined,
+              end: newAlertEnd || undefined
+          } : undefined
+      });
+      
       setNewAlertMsg('');
-  };
-
-  const handleAddWindow = () => {
-    if (!newWindowName) return;
-    addWindow(newWindowName);
-    setNewWindowName('');
-  };
-
-  const handleDeleteSelectedWindow = () => {
-      if(!windowToDelete) return;
-      const win = layout.floatingWindows.find(w => w.id === windowToDelete);
-      if(win && window.confirm(`Tem certeza que deseja excluir o painel "${win.name}" e todo seu conteúdo?`)) {
-          removeWindow(windowToDelete);
-          setWindowToDelete('');
-      }
+      setNewAlertStart('');
+      setNewAlertEnd('');
   };
 
   const handleCreateUser = () => {
@@ -487,108 +504,49 @@ const SettingsPanel: React.FC = () => {
                                 <Toggle label="Ativar Banner Superior" checked={layout.header.showTopMedia} onChange={v => updateLayout({ header: { ...layout.header, showTopMedia: v } })} />
                              </div>
                         </div>
-
-                        {/* Windows Management Section */}
-                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6 mb-8">
-                           <h3 className="font-bold text-white mb-4 flex items-center gap-2"><Maximize size={20} className="text-brewery-accent"/> Gerenciar Janelas</h3>
-                           <div className="flex gap-4 items-end mb-4">
-                              <div className="flex-1">
-                                <label className="text-xs uppercase font-bold text-zinc-500 mb-1 block">Nome da Nova Janela</label>
-                                <input 
-                                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-white focus:border-brewery-accent outline-none"
-                                  placeholder="Ex: Painel Lateral 02"
-                                  value={newWindowName}
-                                  onChange={e => setNewWindowName(e.target.value)}
-                                />
-                              </div>
-                              <button onClick={handleAddWindow} className="bg-brewery-accent text-black font-bold px-6 py-2.5 rounded-lg hover:bg-amber-400 transition-colors h-10 flex items-center gap-2"><Plus size={18}/> Criar Janela</button>
-                           </div>
-                           
-                           <div className="flex flex-col gap-2">
-                              <label className="text-[10px] uppercase font-bold text-zinc-500">Janelas Ativas</label>
-                              <div className="flex flex-wrap gap-2">
-                                {layout.floatingWindows.map(win => (
-                                    <div key={win.id} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 flex items-center gap-3 text-sm text-zinc-300 group hover:border-white/20 transition-all">
-                                    <span className="font-bold">{win.name}</span>
-                                    <button 
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if(window.confirm(`Deseja realmente apagar a janela "${win.name}"?`)) {
-                                                removeWindow(win.id);
-                                            }
-                                        }} 
-                                        className="text-zinc-500 hover:text-rose-500 transition-colors p-1 bg-white/5 hover:bg-rose-500/10 rounded cursor-pointer" 
-                                        title="Apagar Janela"
-                                    >
-                                        <Trash2 size={14}/>
-                                    </button>
-                                    </div>
-                                ))}
-                                {layout.floatingWindows.length === 0 && <span className="text-zinc-600 text-xs italic">Nenhuma janela flutuante ativa.</span>}
-                              </div>
-                           </div>
-
-                           {/* Explicit Option to Choose Which Panel to Delete */}
-                           <div className="mt-6 pt-4 border-t border-white/5">
-                                <label className="text-xs uppercase font-bold text-zinc-500 mb-2 block">Excluir Painel Específico</label>
-                                <div className="flex gap-3 items-center">
-                                    <select 
-                                        className="flex-1 bg-black/40 border border-white/10 rounded-lg p-2.5 text-white focus:border-rose-500 outline-none text-sm transition-colors cursor-pointer"
-                                        onChange={(e) => setWindowToDelete(e.target.value)}
-                                        value={windowToDelete}
-                                    >
-                                        <option value="">Selecione um painel para excluir...</option>
-                                        {layout.floatingWindows.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                    </select>
-                                    <button 
-                                        type="button"
-                                        onClick={handleDeleteSelectedWindow}
-                                        disabled={!windowToDelete}
-                                        className="bg-rose-950/50 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-900 hover:border-rose-500 px-6 py-2.5 rounded-lg text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                    >
-                                        <Trash2 size={18} /> Excluir
-                                    </button>
-                                </div>
-                           </div>
-                        </div>
                         
-                        {/* Combine Floating Windows and Banner into one list for iteration */}
-                        {[
-                             ...layout.floatingWindows.map(w => ({ id: w.id, name: w.name, isBanner: false })),
-                             ...(layout.header.showTopMedia ? [{ id: 'banner', name: 'Banner do Cabeçalho', isBanner: true }] : [])
-                        ].map((win) => {
-                           const key = win.id;
-                           const items = playlists[key] || [];
+                        <div className="space-y-6">
+                          {/* Combine Floating Windows and Banner into one list for iteration */}
+                          {[
+                            ...layout.floatingWindows.map(w => ({ id: w.id, name: w.name, isBanner: false, visible: w.visible })),
+                            ...(layout.header.showTopMedia ? [{ id: 'banner', name: 'Banner do Cabeçalho', isBanner: true, visible: true }] : [])
+                          ].map((win) => {
+                            const key = win.id;
+                            const items = playlists[key] || [];
 
-                           return (
-                            <div key={key} className="bg-zinc-900/30 border border-white/10 rounded-2xl overflow-hidden mb-6">
+                            return (
+                              <div key={key} className="bg-zinc-900/30 border border-white/10 rounded-2xl overflow-hidden mb-6">
+                                
+                                {/* CABEÇALHO DO CARD DA JANELA */}
                                 <div className="bg-white/5 p-4 flex justify-between items-center border-b border-white/5">
-                                    <h3 className="font-bold text-lg text-white uppercase flex items-center gap-2">
+                                  <div className="flex items-center gap-3">
+                                     <h3 className="font-bold text-lg text-white uppercase flex items-center gap-2">
                                         <Monitor size={18} className="text-brewery-accent"/> 
-                                        {win.name} 
-                                        {win.isBanner && <span className="bg-emerald-500/20 text-emerald-500 text-[10px] px-2 py-0.5 rounded ml-2 border border-emerald-500/20">BANNER</span>}
-                                    </h3>
-                                    
-                                    <div className="flex items-center gap-4">
-                                        <span className="text-xs font-mono bg-black/40 px-3 py-1 rounded text-zinc-400">{items.length} itens</span>
-                                        {/* Added delete button directly on the card header as well for better UX */}
-                                        {!win.isBanner && (
-                                            <button 
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if(window.confirm(`Deseja realmente apagar a janela "${win.name}" e todo o seu conteúdo?`)) {
-                                                        removeWindow(win.id);
-                                                    }
-                                                }} 
-                                                className="bg-rose-600 hover:bg-rose-500 text-white p-2 rounded-lg transition-colors shadow-lg shadow-rose-900/20" 
-                                                title="Apagar Janela"
-                                            >
-                                                <Trash2 size={18}/>
-                                            </button>
+                                        {win.name}
+                                        {/* Tag Visual para identificar o Banner */}
+                                        {win.isBanner && (
+                                          <span className="text-[10px] bg-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded border border-emerald-500/30">
+                                            BANNER
+                                          </span>
                                         )}
-                                    </div>
+                                        {!win.isBanner && (
+                                            <span className={`text-[10px] px-2 py-0.5 rounded border ${win.visible ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                                {win.visible ? 'VISÍVEL' : 'OCULTO'}
+                                            </span>
+                                        )}
+                                     </h3>
+                                  </div>
+                                  {!win.isBanner && (
+                                      <div className="flex items-center gap-3">
+                                          <button
+                                            onClick={() => updateWindow(win.id, { visible: !win.visible })}
+                                            className={`p-2 rounded-lg transition-colors border ${win.visible ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-white'}`}
+                                            title={win.visible ? 'Ocultar Janela' : 'Mostrar Janela'}
+                                          >
+                                              {win.visible ? <Eye size={18} /> : <EyeOff size={18} />}
+                                          </button>
+                                      </div>
+                                  )}
                                 </div>
                                 
                                 <div className="p-6">
@@ -662,6 +620,7 @@ const SettingsPanel: React.FC = () => {
                             </div>
                            );
                         })}
+                        </div>
                     </div>
                 )}
 
@@ -682,7 +641,29 @@ const SettingsPanel: React.FC = () => {
                                             value={newAlertMsg}
                                             onChange={e => setNewAlertMsg(e.target.value)}
                                         />
-                                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1 flex items-center gap-1"><Calendar size={10} /> Início (Opcional)</label>
+                                                <input 
+                                                    type="datetime-local" 
+                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-brewery-accent outline-none appearance-none"
+                                                    value={newAlertStart}
+                                                    onChange={e => setNewAlertStart(e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1 flex items-center gap-1"><ClockIcon size={10} /> Fim (Opcional)</label>
+                                                <input 
+                                                    type="datetime-local" 
+                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-brewery-accent outline-none appearance-none"
+                                                    value={newAlertEnd}
+                                                    onChange={e => setNewAlertEnd(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-2">
                                             <div className="flex gap-2 flex-wrap">
                                                 {(['INFO', 'WARNING', 'CRITICAL', 'ATTENTION'] as AnnouncementType[]).map(type => (
                                                     <button 
@@ -712,6 +693,8 @@ const SettingsPanel: React.FC = () => {
                                                 <p className="text-white font-bold text-lg">{alert.message}</p>
                                                 <div className="flex gap-2 text-[10px] text-zinc-500 mt-1 uppercase font-bold tracking-wider">
                                                     <span>{alert.type}</span> • <span>{alert.displayMode}</span>
+                                                    {alert.schedule?.start && <span> • Início: {new Date(alert.schedule.start).toLocaleString()}</span>}
+                                                    {alert.schedule?.end && <span> • Fim: {new Date(alert.schedule.end).toLocaleString()}</span>}
                                                 </div>
                                             </div>
                                             <button onClick={() => removeAnnouncement(alert.id)} className="relative z-10 text-zinc-600 hover:text-rose-500 p-2"><X size={20}/></button>
@@ -807,17 +790,52 @@ const SettingsPanel: React.FC = () => {
                                 <div>
                                     <label className="text-xs uppercase font-bold text-zinc-500 mb-4 block text-center">Selecione o Efeito Visual</label>
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                        {(['BUBBLES', 'CONFETTI', 'GLOW', 'DISCO', 'WORLDCUP', 'OLYMPICS', 'BIRTHDAY', 'BONUS', 'GOAL', 'CUSTOM'] as PartyEffect[]).map(effect => (
+                                        {(Object.keys(PARTY_EFFECT_LABELS) as PartyEffect[]).map(effect => (
                                             <button 
                                                 key={effect}
                                                 onClick={() => updateLayout({ partyEffect: effect })}
-                                                className={`p-4 rounded-xl border text-sm font-bold transition-all ${layout.partyEffect === effect ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'bg-black/40 border-white/5 text-zinc-500 hover:border-white/20 hover:text-white'}`}
+                                                className={`p-4 rounded-xl border text-sm font-bold transition-all flex flex-col items-center justify-center gap-2 text-center h-24 ${layout.partyEffect === effect ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'bg-black/40 border-white/5 text-zinc-500 hover:border-white/20 hover:text-white'}`}
                                             >
-                                                {effect}
+                                                {PARTY_EFFECT_LABELS[effect]}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
+
+                                {layout.partyEffect === 'CUSTOM' && (
+                                    <div className="max-w-md mx-auto animate-in fade-in slide-in-from-top-4 p-6 bg-black/30 border border-purple-500/30 rounded-2xl">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs uppercase font-bold text-purple-400 mb-1 block">URL da Imagem ou GIF</label>
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none"
+                                                        value={layout.customPartyImage || ''}
+                                                        onChange={e => updateLayout({ customPartyImage: e.target.value })}
+                                                        placeholder="https://exemplo.com/festa.gif"
+                                                    />
+                                                    <label className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 rounded-lg flex items-center justify-center cursor-pointer border border-white/10 transition-colors" title="Carregar do Dispositivo">
+                                                        <Upload size={18} />
+                                                        <input 
+                                                            type="file" 
+                                                            className="hidden" 
+                                                            accept="image/*" 
+                                                            onChange={handleCustomPartyFileUpload} 
+                                                        />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <Toggle 
+                                                label="Remover Fundo (Multiplicar)" 
+                                                checked={layout.customPartyRemoveBg || false} 
+                                                onChange={v => updateLayout({ customPartyRemoveBg: v })} 
+                                            />
+                                            <p className="text-[10px] text-zinc-500 italic text-center">
+                                                A opção "Remover Fundo" aplica um efeito de mesclagem para tornar fundos brancos transparentes. Ideal para cliparts ou logotipos em fundo branco.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

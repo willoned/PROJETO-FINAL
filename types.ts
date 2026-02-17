@@ -99,6 +99,7 @@ export interface FloatingWindowConfig {
   y: number;
   w: number;
   h: number;
+  visible: boolean;
 }
 
 export interface HeaderSettings {
@@ -138,6 +139,7 @@ export interface LayoutSettings {
   partyEffect: PartyEffect;
   partyColor?: string;
   customPartyImage?: string;
+  customPartyRemoveBg?: boolean;
 }
 
 export interface ConnectionSettings {

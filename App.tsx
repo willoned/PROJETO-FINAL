@@ -77,7 +77,7 @@ const InternalHeader = () => {
 };
 
 const CanvasLayout = () => {
-  const { announcements, layout, lineConfigs, updateLine, updateLayout, updateWindow, isEditing, machines } = useMachineContext();
+  const { announcements, layout, lineConfigs, updateLine, updateLayout, updateWindow, removeWindow, isEditing, machines } = useMachineContext();
   const { isAuthenticated } = useAuth();
   
   const [dragState, setDragState] = useState<{ type: 'CARD' | 'MEDIA' | 'LOGO' | null; id: string | null; startX: number; startY: number; initialX: number; initialY: number; }>({ type: null, id: null, startX: 0, startY: 0, initialX: 0, initialY: 0 });
@@ -178,13 +178,32 @@ const CanvasLayout = () => {
             </div>
         )}
 
-        {layout.showMediaPanel && layout.floatingWindows.map(win => (
+        {layout.showMediaPanel && layout.floatingWindows.map(win => {
+            // Only render enabled windows
+            if (!win.visible && !isEditing) return null;
+            
+            // In Edit Mode, you might want to show them semi-transparent or with an indicator, 
+            // but for now we follow the simple "active" logic. 
+            // If the user wants to position a hidden window, they should enable it first in Settings.
+            if (!win.visible) return null;
+
+            return (
             <div key={win.id} style={{ position: 'absolute', left: win.x, top: win.y, width: win.w, height: win.h, zIndex: 100 }} className="rounded-xl shadow-2xl flex flex-col overflow-hidden border bg-brewery-card border-brewery-accent/50 group">
-                {isEditing && isAuthenticated && <div className="h-6 bg-black/80 cursor-move absolute top-0 left-0 right-0 z-50 flex items-center justify-center text-[10px] text-zinc-400 font-bold uppercase tracking-widest border-b border-white/10 hover:bg-brewery-accent hover:text-black transition-colors" onMouseDown={(e) => handleDragStart(e, 'MEDIA', win.id, win.x, win.y)}><Move size={10} className="mr-2"/> Janela: {win.name}</div>}
+                {isEditing && isAuthenticated && (
+                    <div className="h-7 bg-black/90 absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 border-b border-white/10 select-none">
+                        <div 
+                            className="flex-1 h-full flex items-center cursor-move text-[10px] text-zinc-400 font-bold uppercase tracking-widest hover:text-white transition-colors" 
+                            onMouseDown={(e) => handleDragStart(e, 'MEDIA', win.id, win.x, win.y)}
+                        >
+                            <Move size={10} className="mr-2"/> 
+                            <span className="truncate max-w-[150px]">{win.name}</span>
+                        </div>
+                    </div>
+                )}
                 <MediaPanel playlistKey={win.id} />
                 {isEditing && isAuthenticated && <div className="absolute bottom-0 right-0 w-6 h-6 p-0.5 cursor-nwse-resize text-white z-50 bg-black/40 rounded-tl" onMouseDown={(e) => handleResizeStart(e, 'MEDIA', win.id)}><Scaling size={14} className="transform rotate-90" /></div>}
             </div>
-        ))}
+        )})}
 
         {/* Scrollable Container with Massive Size for Large TVs */}
         <div className="absolute inset-0 overflow-auto custom-scrollbar bg-black/5">
