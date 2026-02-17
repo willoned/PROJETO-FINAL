@@ -1,41 +1,31 @@
-// Visual preferences for what data to show on the card
+
 export interface DisplayConfig {
-  showVolume: boolean;  // Production Count
-  showPB: boolean;      // PB (Efficiency/OEE or Gross Production)
-  showHourly: boolean;  // Current Hourly Rate
-  showTemp: boolean;    // Temperature
-  showTrend: boolean;   // The bottom chart (Area)
-  showBarChart: boolean; // NEW: The bottom chart (Bar)
+  showVolume: boolean;
+  showPB: boolean;
+  showHourly: boolean;
+  showTemp: boolean;
+  showTrend: boolean;
+  showBarChart: boolean;
 }
 
-// Data Mapping for Node-RED bridge
 export interface DataMapping {
-  productionKey: string;   // Maps to productionCount
-  speedKey: string;        // Maps to currentHourlyRate
-  temperatureKey: string;  // Maps to temperature
-  rejectKey: string;       // Maps to rejectCount
-  statusKey: string;       // Maps to status ('RUNNING' | 'STOPPED' | etc)
-  efficiencyKey: string;   // Maps to efficiency
+  productionKey: string;
+  speedKey: string;
+  temperatureKey: string;
+  rejectKey: string;
+  statusKey: string;
+  efficiencyKey: string;
 }
 
-// STRICT INTERFACE FOR RAW NODE-RED DATA
 export interface NodeRedPayload {
   id?: string;
   topic?: string;
   payload: {
     [key: string]: string | number | boolean | undefined;
-    // Common keys expected based on mapping, but dynamic
-    count?: number;
-    rate_h?: number;
-    temp_c?: number;
-    rejects?: number;
-    status?: string;
-    oee?: number;
-  } | number | string; // Payload can sometimes be primitive
+  } | number | string;
   timestamp?: number;
 }
 
-// Defines the configuration for a production line (static data)
 export interface LineConfig {
   id: string;
   name: string;
@@ -66,8 +56,8 @@ export interface MachineData {
   currentHourlyRate: number; 
   rejectCount: number;
   temperature: number;
-  lastUpdated: number; 
   efficiency: number; 
+  lastUpdated: number; 
   trend: TrendPoint[];
 }
 
@@ -155,36 +145,98 @@ export interface ConnectionSettings {
   host: string;
   port: string;
   path: string;
-  username?: string;
-  password?: string;
   autoConnect: boolean;
 }
 
-// CONTEXT INTERFACES
+export interface MachineContextType {
+  // State
+  machines: Record<string, MachineData>;
+  lineConfigs: LineConfig[];
+  layout: LayoutSettings;
+  connectionConfig: ConnectionSettings;
+  playlists: Record<string, MediaItem[]>;
+  announcements: Announcement[];
+  
+  // UI State
+  showSettings: boolean;
+  isEditing: boolean;
+  connectionStatus: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'ERROR';
+  
+  // Actions
+  toggleSettings: () => void;
+  setEditing: (editing: boolean) => void;
+  updateLayout: (settings: Partial<LayoutSettings>) => void;
+  updateConnectionConfig: (settings: Partial<ConnectionSettings>) => void;
+  
+  addLine: (config: LineConfig) => void;
+  updateLine: (id: string, config: Partial<LineConfig>) => void;
+  removeLine: (id: string) => void;
+  
+  addMedia: (playlistKey: string, item: MediaItem) => void;
+  removeMedia: (playlistKey: string, id: string) => void;
+  updateMedia: (playlistKey: string, id: string, data: Partial<MediaItem>) => void;
+  reorderMedia: (playlistKey: string, startIndex: number, endIndex: number) => void;
+  
+  addAnnouncement: (item: Announcement) => void;
+  removeAnnouncement: (id: string) => void;
+
+  addWindow: (name: string) => void;
+  updateWindow: (id: string, config: Partial<FloatingWindowConfig>) => void;
+  removeWindow: (id: string) => void;
+}
+
+export type UserRole = 'ADMIN' | 'CREATOR';
+export type PermissionTab = 'LINES' | 'API' | 'LAYOUT' | 'MEDIA' | 'ALERTS' | 'PARTY' | 'HEADER';
+
+export interface User {
+  username: string;
+  password?: string; // Only used for internal storage, not exposed ideally
+  role: UserRole;
+  permissions: PermissionTab[]; // Which tabs can they see?
+}
+
+export interface AuthContextType {
+  user: User | null;
+  usersList: User[];
+  login: (username: string, pass: string) => Promise<boolean>;
+  logout: () => void;
+  createUser: (user: User) => void;
+  deleteUser: (username: string) => void;
+  isAuthenticated: boolean;
+}
 
 export interface LayoutContextType {
   lineConfigs: LineConfig[];
-  
   playlists: Record<string, MediaItem[]>;
   announcements: Announcement[];
   showSettings: boolean;
   layout: LayoutSettings;
   connectionConfig: ConnectionSettings;
-  
-  // Actions
-  addMedia: (playlistKey: string, item: MediaItem) => void;
-  removeMedia: (playlistKey: string, id: string) => void;
-  updateMedia: (playlistKey: string, id: string, data: Partial<MediaItem>) => void;
-  reorderMedia: (playlistKey: string, startIndex: number, endIndex: number) => void;
+  isEditing: boolean;
+  isLockedByOther: boolean;
+  lockedBy: string | null;
+
+  addMedia: (key: string, item: MediaItem) => void;
+  removeMedia: (key: string, id: string) => void;
+  updateMedia: (key: string, id: string, data: Partial<MediaItem>) => void;
+  reorderMedia: (key: string, startIndex: number, endIndex: number) => void;
+
   addAnnouncement: (item: Announcement) => void;
   removeAnnouncement: (id: string) => void;
+
   toggleSettings: () => void;
+  requestLock: () => void;
+  releaseLock: () => void;
+  saveLayout: () => void;
+
   updateLayout: (settings: Partial<LayoutSettings>) => void;
   updateConnectionConfig: (settings: Partial<ConnectionSettings>) => void;
+
   addWindow: (name: string) => void;
-  removeWindow: (id: string) => void;
   updateWindow: (id: string, config: Partial<FloatingWindowConfig>) => void;
+  removeWindow: (id: string) => void;
   resetWindowDimensions: () => void;
+
   addLine: (config: LineConfig) => void;
   updateLine: (id: string, config: Partial<LineConfig>) => void;
   removeLine: (id: string) => void;
@@ -198,4 +250,5 @@ export interface DataContextType {
   lastHeartbeat: number;
   isStale: boolean;
   clearError: () => void;
+  setError: (msg: string) => void;
 }

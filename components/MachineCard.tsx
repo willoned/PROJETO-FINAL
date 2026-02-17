@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Box, Thermometer, Zap, AlertTriangle, GripVertical, Scaling, Clock, Move, WifiOff, Image as ImageIcon } from 'lucide-react';
+import { Box, Thermometer, Zap, AlertTriangle, Scaling, Clock, Move, WifiOff } from 'lucide-react';
 import { MachineData, LineConfig } from '../types';
 import { STATUS_COLORS } from '../constants';
 import TrendChart from './TrendChart';
@@ -13,7 +13,7 @@ interface Props {
 }
 
 const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
-  const { updateLine, layout } = useMachineContext();
+  const { updateLine, layout, isEditing } = useMachineContext();
   const display = config.display || { showVolume: false, showPB: false, showHourly: false, showTemp: false, showTrend: false, showBarChart: false };
 
   // Local resize state
@@ -109,18 +109,19 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
       rounded-xl shadow-xl flex flex-col overflow-hidden relative group transition-all duration-300
       ${layout.isPartyMode ? 'bg-purple-900/40 border border-purple-500/50 backdrop-blur-sm' : 'bg-brewery-card border border-brewery-border'}
       ${status === 'ALARM' ? 'animate-pulse-border border-amber-500/80 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : ''}
-      hover:border-brewery-accent
+      ${isEditing ? 'hover:border-brewery-accent ring-1 ring-white/10' : 'hover:border-brewery-accent'}
       ${isResizing ? 'ring-2 ring-brewery-accent border-transparent z-50' : ''}
       h-full w-full select-none
     `}>
       {/* 1. Header (Draggable Area) */}
-      <div className={`${cardPadding} flex justify-between items-start z-10 relative`}>
-        <div className="flex gap-2 items-center overflow-hidden flex-1">
-            {/* Grip (Pass drag props here) */}
+      <div 
+        className={`${cardPadding} flex justify-between items-start z-10 relative transition-colors ${isEditing ? 'cursor-move bg-white/5' : ''}`}
+        onMouseDown={isEditing ? dragHandleProps?.onMouseDown : undefined}
+      >
+        <div className="flex gap-2 items-center overflow-hidden flex-1 pointer-events-none">
+            {/* Grip Icon - always visible but highlighted in edit mode */}
             <div 
-              {...dragHandleProps}
-              className="cursor-move text-brewery-muted hover:text-white shrink-0 p-1 hover:bg-black/40 rounded active:bg-brewery-accent transition-colors"
-              title="Mover (Arraste aqui)"
+              className={`shrink-0 p-1 rounded transition-colors ${isEditing ? 'bg-brewery-accent text-black' : 'text-brewery-muted'}`}
             >
                <Move size={16} />
             </div>
@@ -216,13 +217,15 @@ const MachineCard: React.FC<Props> = ({ config, data, dragHandleProps }) => {
       )}
 
       {/* Resize Handle (Bottom Right) */}
-      <div 
-        className="absolute bottom-0 right-0 w-6 h-6 flex items-end justify-end p-0.5 cursor-nwse-resize text-brewery-muted hover:text-brewery-accent z-50 opacity-0 group-hover:opacity-100 transition-opacity"
-        onMouseDown={handleResizeStart}
-        title="Redimensionar"
-      >
-          <Scaling size={14} className="transform rotate-90" />
-      </div>
+      {isEditing && (
+        <div 
+          className="absolute bottom-0 right-0 w-6 h-6 flex items-end justify-end p-0.5 cursor-nwse-resize text-white z-50 bg-black/20 rounded-tl"
+          onMouseDown={handleResizeStart}
+          title="Redimensionar"
+        >
+            <Scaling size={14} className="transform rotate-90" />
+        </div>
+      )}
 
     </div>
   );

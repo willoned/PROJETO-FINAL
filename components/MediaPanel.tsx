@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMachineContext } from '../context/MachineContext';
+import { useAuth } from '../context/AuthContext';
 import { Upload, Play, Pause, Plus, FileVideo, FileImage, List, X, ArrowUp, ArrowDown, Trash2, FileCode, Globe } from 'lucide-react';
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 
 const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   const { playlists, addMedia, removeMedia, reorderMedia, layout } = useMachineContext();
+  const { isAuthenticated } = useAuth();
   
   // Select the specific playlist based on the key passed (floating vs banner)
   const mediaPlaylist = playlists[playlistKey] || [];
@@ -106,7 +108,7 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   }, []);
 
   const processFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
+    if (!files || !isAuthenticated) return; // Guard: No adding files if not auth
 
     Array.from(files).forEach((file) => {
       const isVideo = file.type.startsWith('video/');
@@ -130,7 +132,7 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         duration: isHtml ? 30 : 10 // Default 30s for HTML, 10s for images
       });
     });
-  }, [addMedia, playlistKey]);
+  }, [addMedia, playlistKey, isAuthenticated]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     processFiles(e.target.files);
@@ -138,16 +140,19 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
 
   // Drag and Drop Handlers
   const onDragOver = (e: React.DragEvent) => {
+    if (!isAuthenticated) return;
     e.preventDefault();
     setIsDragging(true);
   };
 
   const onDragLeave = (e: React.DragEvent) => {
+    if (!isAuthenticated) return;
     e.preventDefault();
     setIsDragging(false);
   };
 
   const onDrop = (e: React.DragEvent) => {
+    if (!isAuthenticated) return;
     e.preventDefault();
     setIsDragging(false);
     processFiles(e.dataTransfer.files);
@@ -157,7 +162,6 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   const fitClass = layout.mediaFit === 'COVER' ? 'object-cover' : 'object-contain';
 
   // Circular Progress Calculation
-  // Calculate fill percentage: starts at 0% (timeLeft == max) -> goes to 100% (timeLeft == 0)
   const progressPercentage = maxDuration > 0 
     ? Math.max(0, Math.min(100, ((maxDuration - timeLeft) / maxDuration) * 100))
     : 0;
@@ -177,16 +181,27 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         onDrop={onDrop}
       >
         <div className="pointer-events-none flex flex-col items-center">
-            <Upload className={`mb-4 transition-colors ${isDragging ? 'text-indigo-400' : 'text-zinc-600 group-hover:text-indigo-500'}`} size={48} />
-            <h3 className="text-zinc-400 font-medium">{isDragging ? 'Solte os arquivos aqui' : 'Playlist Vazia'}</h3>
-            <p className="text-zinc-600 text-xs mt-1 mb-4 text-center">Arraste arquivos ou clique para adicionar.<br/>Suporta Imagens, Vídeos e HTML.</p>
+            {isAuthenticated ? (
+                <>
+                    <Upload className={`mb-4 transition-colors ${isDragging ? 'text-indigo-400' : 'text-zinc-600 group-hover:text-indigo-500'}`} size={48} />
+                    <h3 className="text-zinc-400 font-medium">{isDragging ? 'Solte os arquivos aqui' : 'Playlist Vazia'}</h3>
+                    <p className="text-zinc-600 text-xs mt-1 mb-4 text-center">Arraste arquivos ou clique para adicionar.<br/>Suporta Imagens, Vídeos e HTML.</p>
+                </>
+            ) : (
+                <>
+                    <FileImage className="mb-4 text-zinc-700" size={48} />
+                    <h3 className="text-zinc-500 font-medium">Sem Mídia</h3>
+                </>
+            )}
         </div>
         
-        <label className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded cursor-pointer transition text-white text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 z-10">
-          <Plus size={16} />
-          Adicionar Mídia
-          <input type="file" className="hidden" multiple accept="image/*,video/*,text/html,.html,.htm" onChange={handleFileUpload} />
-        </label>
+        {isAuthenticated && (
+            <label className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded cursor-pointer transition text-white text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 z-10">
+            <Plus size={16} />
+            Adicionar Mídia
+            <input type="file" className="hidden" multiple accept="image/*,video/*,text/html,.html,.htm" onChange={handleFileUpload} />
+            </label>
+        )}
       </div>
     );
   }
@@ -201,7 +216,7 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         onDrop={onDrop}
     >
       {/* Drag Overlay */}
-      {isDragging && (
+      {isDragging && isAuthenticated && (
         <div className="absolute inset-0 z-50 bg-indigo-900/80 backdrop-blur-sm flex items-center justify-center border-4 border-indigo-500 rounded-xl">
            <Upload className="text-white animate-bounce" size={64} />
         </div>
@@ -282,7 +297,6 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         </div>
         
         {/* Info Overlay - Outside Zoom Context */}
-        {/* Removed Media Name/Icon per request - kept only playlist indicators */}
         <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pb-2 z-10 pointer-events-none transition-opacity duration-300 ${showPlaylist ? 'opacity-0' : 'opacity-100'} flex justify-center`}>
           {/* Playlist Indicators (Small Dots) */}
           <div className="flex gap-1 h-1 bg-zinc-800/50 rounded-full overflow-hidden w-1/3 opacity-50">
@@ -296,32 +310,34 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         </div>
       </div>
 
-      {/* Floating Toolbar */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2 z-20 transition-transform duration-300 translate-x-16 group-hover:translate-x-0">
-        <button 
-          onClick={() => setShowPlaylist(!showPlaylist)}
-          className={`p-3 rounded-xl backdrop-blur-md border shadow-xl transition-all hover:scale-105 ${showPlaylist ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-zinc-900/80 hover:bg-zinc-800 text-white border-zinc-700'}`}
-          title="Playlist"
-        >
-          <List size={20} />
-        </button>
+      {/* Floating Toolbar - HIDDEN IF NOT AUTHENTICATED */}
+      {isAuthenticated && (
+        <div className="absolute top-4 right-4 flex flex-col gap-2 z-20 transition-transform duration-300 translate-x-16 group-hover:translate-x-0">
+            <button 
+            onClick={() => setShowPlaylist(!showPlaylist)}
+            className={`p-3 rounded-xl backdrop-blur-md border shadow-xl transition-all hover:scale-105 ${showPlaylist ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-zinc-900/80 hover:bg-zinc-800 text-white border-zinc-700'}`}
+            title="Playlist"
+            >
+            <List size={20} />
+            </button>
 
-        <button 
-          onClick={() => setIsPlaying(!isPlaying)}
-          className="p-3 bg-zinc-900/80 hover:bg-zinc-800 text-white rounded-xl backdrop-blur-md border border-zinc-700 shadow-xl transition-all hover:scale-105"
-          title={isPlaying ? "Pausar" : "Reproduzir"}
-        >
-          {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-        </button>
-        
-        <label className="p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl cursor-pointer shadow-xl shadow-indigo-900/40 transition-all hover:scale-105" title="Adicionar Mídia">
-          <Upload size={20} />
-          <input type="file" className="hidden" multiple accept="image/*,video/*,text/html,.html,.htm" onChange={handleFileUpload} />
-        </label>
-      </div>
+            <button 
+            onClick={() => setIsPlaying(!isPlaying)}
+            className="p-3 bg-zinc-900/80 hover:bg-zinc-800 text-white rounded-xl backdrop-blur-md border border-zinc-700 shadow-xl transition-all hover:scale-105"
+            title={isPlaying ? "Pausar" : "Reproduzir"}
+            >
+            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+            </button>
+            
+            <label className="p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl cursor-pointer shadow-xl shadow-indigo-900/40 transition-all hover:scale-105" title="Adicionar Mídia">
+            <Upload size={20} />
+            <input type="file" className="hidden" multiple accept="image/*,video/*,text/html,.html,.htm" onChange={handleFileUpload} />
+            </label>
+        </div>
+      )}
 
       {/* Internal Playlist Sidebar */}
-      {showPlaylist && (
+      {showPlaylist && isAuthenticated && (
          <div className="absolute inset-y-0 right-0 w-80 bg-zinc-950/95 backdrop-blur-xl border-l border-zinc-800 z-30 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-zinc-800 flex justify-between items-center shrink-0">
                 <h3 className="font-bold text-white flex items-center gap-2"><List size={18}/> Playlist</h3>

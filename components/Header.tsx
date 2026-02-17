@@ -66,11 +66,11 @@ const Header = () => {
         </div>
 
         <button 
-          onClick={toggleSettings}
-          className="p-2 bg-black/30 hover:bg-black/50 rounded-lg text-brewery-muted hover:text-white transition border border-brewery-border hover:border-brewery-accent"
-          title="Configurações"
+        onClick={toggleSettings}
+        className="p-2 bg-black/30 hover:bg-black/50 rounded-lg text-brewery-muted hover:text-white transition border border-brewery-border hover:border-brewery-accent"
+        title="Configurações"
         >
-          <Settings size={20} />
+        <Settings size={20} />
         </button>
       </div>
     </header>

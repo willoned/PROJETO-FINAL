@@ -62,7 +62,7 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
               ${announcement.type === 'ATTENTION' 
                 ? 'bg-orange-950/80 border-l-orange-500 border-y border-r border-white/10 text-orange-100 animate-flash-attention' 
                 : announcement.type === 'CRITICAL' 
-                ? 'bg-rose-950/90 border-l-rose-600 border-y border-r border-rose-500/30 text-white animate-pulse-critical' 
+                ? 'bg-rose-950 border-l-rose-600 border-y border-r border-rose-500 text-white animate-pulse-critical' 
                 : announcement.type === 'WARNING'
                 ? 'bg-amber-950/60 border-l-amber-500 border-y border-r border-white/5 text-amber-100'
                 : 'bg-blue-950/40 border-l-blue-500 border-y border-r border-white/5 text-blue-100'
@@ -70,13 +70,13 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
             `}
           >
             {announcement.type === 'ATTENTION' && <Megaphone className="text-orange-500 mr-3 shrink-0 animate-wiggle" size={fontSize * 1.2} strokeWidth={2.5} />}
-            {announcement.type === 'CRITICAL' && <AlertCircle className="text-rose-500 mr-3 shrink-0 animate-ping-slow" size={fontSize * 1.2} strokeWidth={3} />}
+            {announcement.type === 'CRITICAL' && <AlertCircle className="text-white mr-3 shrink-0 animate-ping-slow" size={fontSize * 1.2} strokeWidth={3} />}
             {announcement.type === 'WARNING' && <AlertTriangle className="text-amber-500 mr-3 shrink-0" size={fontSize * 1.2} />}
             {announcement.type === 'INFO' && <Info className="text-blue-400 mr-3 shrink-0" size={fontSize * 1.2} />}
             
             <span 
                 className={`font-mono font-bold tracking-tight uppercase ${
-                  announcement.type === 'CRITICAL' ? 'drop-shadow-[0_0_5px_rgba(244,63,94,0.8)]' : ''
+                  announcement.type === 'CRITICAL' ? 'drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]' : ''
                 }`}
                 style={{ fontSize: `${fontSize}px` }}
             >
@@ -92,16 +92,19 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
           100% { transform: translate3d(-10%, 0, 0); }
         }
         
-        /* SOPHISTICATED CRITICAL ANIMATION: Aggressive Red Flash */
+        /* AGGRESSIVE CRITICAL ANIMATION */
         @keyframes pulse-critical {
           0%, 100% { 
-            box-shadow: 0 0 10px rgba(225, 29, 72, 0.2) inset;
-            border-color: rgba(225, 29, 72, 0.5);
+            background-color: #7f1d1d; /* red-900 */
+            border-color: #ef4444;
+            transform: scale(1);
+            box-shadow: none;
           }
           50% { 
-            box-shadow: 0 0 30px rgba(225, 29, 72, 0.6) inset;
-            border-color: rgba(255, 255, 255, 0.8);
-            background-color: rgba(136, 19, 55, 0.9);
+            background-color: #ef4444; /* red-500 */
+            border-color: #ffffff;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #ef4444;
           }
         }
 
@@ -128,7 +131,7 @@ const AnnouncementsTicker: React.FC<Props> = ({ announcements }) => {
         }
 
         .animate-pulse-critical {
-          animation: pulse-critical 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          animation: pulse-critical 0.8s ease-in-out infinite;
         }
 
         .animate-flash-attention {

@@ -16,12 +16,12 @@
             },
             colors: {
               brewery: {
-                bg: '#1a110d', // Stout escuro (quase preto)
-                card: '#291d18', // Marrom café
-                border: '#452c20', // Madeira escura
-                text: '#fffbeb', // Espuma (Creme claro)
-                muted: '#d6bbaa', // Bege escuro
-                accent: '#f59e0b', // Âmbar (Cerveja)
+                bg: '#1a110d',
+                card: '#291d18',
+                border: '#452c20',
+                text: '#fffbeb',
+                muted: '#d6bbaa',
+                accent: '#f59e0b',
                 foam: '#ffffff'
               }
             },
@@ -31,7 +31,6 @@
               'rise': 'rise 4s infinite ease-in',
               'fall': 'fall 4s infinite linear',
               'float': 'float 6s infinite ease-in-out',
-              'spin-slow': 'spin 3s linear infinite',
             },
             keyframes: {
               'party-glow': {
@@ -70,47 +69,43 @@
       body {
         background-color: #1a110d;
         color: #fffbeb;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
       }
-      /* Custom scrollbar styled for brewery theme */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1a110d; 
-      }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #1a110d; }
       ::-webkit-scrollbar-thumb {
         background: #452c20; 
         border-radius: 4px;
         border: 1px solid #291d18;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #f59e0b; 
-      }
+      ::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.4/",
     "react": "https://esm.sh/react@^19.2.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
     "recharts": "https://esm.sh/recharts@^3.7.0",
-    "vite-plugin-electron/": "https://esm.sh/vite-plugin-electron@^0.29.0/",
-    "electron": "https://esm.sh/electron@^40.2.1",
+    "electron": "https://esm.sh/electron@^40.4.0",
     "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.3",
-    "rollup-plugin-javascript-obfuscator": "https://esm.sh/rollup-plugin-javascript-obfuscator@^1.0.4",
-    "express": "https://esm.sh/express@^5.2.1",
-    "url": "https://esm.sh/url@^0.11.4",
-    "path": "https://esm.sh/path@^0.12.7",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
     "bytenode": "https://esm.sh/bytenode@^1.5.7",
-    "fs": "https://esm.sh/fs@^0.0.1-security"
+    "fs": "https://esm.sh/fs@^0.0.1-security",
+    "path": "https://esm.sh/path@^0.12.7",
+    "url": "https://esm.sh/url@^0.11.4",
+    "express": "https://esm.sh/express@^5.2.1",
+    "ws": "https://esm.sh/ws@^8.19.0",
+    "cors": "https://esm.sh/cors@^2.8.6"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

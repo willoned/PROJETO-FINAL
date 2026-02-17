@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { 
   LayoutContextType, LayoutSettings, LineConfig, ConnectionSettings, 
   MediaItem, Announcement, FloatingWindowConfig 
 } from '../types';
-import { LINE_CONFIGS as INITIAL_LINES, APP_CONFIG } from '../constants';
+import { LINE_CONFIGS as INITIAL_LINES } from '../constants';
 
-// Initial Data
 const DEFAULT_MEDIA: MediaItem[] = [
     { id: '1', type: 'IMAGE', url: 'https://images.unsplash.com/photo-1559526323-cb2f2fe2591b?auto=format&fit=crop&q=80&w=2070', duration: 15, name: 'Happy Hour - Sexta' },
 ];
@@ -14,7 +13,6 @@ const BANNER_MEDIA: MediaItem[] = [
 ];
 
 const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
-const STORAGE_KEY = 'IV_PRO_LAYOUT_V2';
 
 interface LayoutState {
   lineConfigs: LineConfig[];
@@ -23,6 +21,9 @@ interface LayoutState {
   showSettings: boolean;
   layout: LayoutSettings;
   connectionConfig: ConnectionSettings;
+  isEditing: boolean;
+  isLockedByOther: boolean;
+  lockedBy: string | null;
 }
 
 const initialState: LayoutState = {
@@ -61,23 +62,10 @@ const initialState: LayoutState = {
     port: '1880',
     path: '/ws/brewery-data',
     autoConnect: true
-  }
-};
-
-const loadState = (defaultState: LayoutState): LayoutState => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (!stored) return defaultState;
-        const parsed = JSON.parse(stored);
-        return {
-            ...defaultState,
-            ...parsed,
-            layout: { ...defaultState.layout, ...parsed.layout },
-            connectionConfig: { ...defaultState.connectionConfig, ...parsed.connectionConfig }
-        };
-    } catch {
-        return defaultState;
-    }
+  },
+  isEditing: false,
+  isLockedByOther: false,
+  lockedBy: null
 };
 
 type Action = 
@@ -87,7 +75,7 @@ type Action =
   | { type: 'REORDER_MEDIA'; payload: { key: string; startIndex: number; endIndex: number } }
   | { type: 'ADD_ANNOUNCEMENT'; payload: Announcement }
   | { type: 'REMOVE_ANNOUNCEMENT'; payload: string }
-  | { type: 'TOGGLE_SETTINGS' }
+  | { type: 'TOGGLE_SETTINGS'; payload?: boolean }
   | { type: 'UPDATE_LAYOUT'; payload: Partial<LayoutSettings> }
   | { type: 'UPDATE_CONNECTION_CONFIG'; payload: Partial<ConnectionSettings> }
   | { type: 'ADD_LINE'; payload: LineConfig }
@@ -97,7 +85,10 @@ type Action =
   | { type: 'ADD_WINDOW'; payload: { name: string } }
   | { type: 'REMOVE_WINDOW'; payload: string }
   | { type: 'UPDATE_WINDOW'; payload: { id: string; config: Partial<FloatingWindowConfig> } }
-  | { type: 'RESET_WINDOWS_DIMENSIONS' };
+  | { type: 'RESET_WINDOWS_DIMENSIONS' }
+  | { type: 'FULL_STATE_SYNC'; payload: any }
+  | { type: 'LOCK_STATUS_CHANGE'; payload: { isLocked: boolean; user: string | null } }
+  | { type: 'SET_EDITING_MODE'; payload: boolean };
 
 function layoutReducer(state: LayoutState, action: Action): LayoutState {
     switch (action.type) {
@@ -112,7 +103,7 @@ function layoutReducer(state: LayoutState, action: Action): LayoutState {
         }
         case 'ADD_ANNOUNCEMENT': return { ...state, announcements: [...state.announcements, action.payload] };
         case 'REMOVE_ANNOUNCEMENT': return { ...state, announcements: state.announcements.filter(i => i.id !== action.payload) };
-        case 'TOGGLE_SETTINGS': return { ...state, showSettings: !state.showSettings };
+        case 'TOGGLE_SETTINGS': return { ...state, showSettings: action.payload !== undefined ? action.payload : !state.showSettings };
         case 'UPDATE_LAYOUT': {
             const newLayout = { ...state.layout, ...action.payload };
             if(action.payload.header) newLayout.header = { ...state.layout.header, ...action.payload.header };
@@ -136,6 +127,9 @@ function layoutReducer(state: LayoutState, action: Action): LayoutState {
         case 'REMOVE_WINDOW': return { ...state, layout: { ...state.layout, floatingWindows: state.layout.floatingWindows.filter(w => w.id !== action.payload) } };
         case 'UPDATE_WINDOW': return { ...state, layout: { ...state.layout, floatingWindows: state.layout.floatingWindows.map(w => w.id === action.payload.id ? { ...w, ...action.payload.config } : w) } };
         case 'RESET_WINDOWS_DIMENSIONS': return { ...state, layout: { ...state.layout, floatingWindows: state.layout.floatingWindows.map(w => ({ ...w, w: 200, h: 200 })) } };
+        case 'FULL_STATE_SYNC': return { ...state, ...action.payload, layout: { ...state.layout, ...action.payload.layout } };
+        case 'LOCK_STATUS_CHANGE': return { ...state, isLockedByOther: action.payload.isLocked, lockedBy: action.payload.user, showSettings: action.payload.isLocked ? false : state.showSettings, isEditing: action.payload.isLocked ? false : state.isEditing };
+        case 'SET_EDITING_MODE': return { ...state, isEditing: action.payload, showSettings: action.payload };
         default: return state;
     }
 }
@@ -143,11 +137,61 @@ function layoutReducer(state: LayoutState, action: Action): LayoutState {
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
 export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(layoutReducer, initialState, loadState);
+  const [state, dispatch] = useReducer(layoutReducer, initialState);
+  const wsRef = useRef<WebSocket | null>(null);
+  
+  // Generate a random session user ID for this browser tab
+  const [sessionUser] = useState(() => 'User_' + Math.floor(Math.random() * 10000));
+  
+  const triggerError = (msg: string) => {
+      window.dispatchEvent(new CustomEvent('IV_GLOBAL_ERROR', { detail: msg }));
+  };
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    fetch('/api/layout')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => data && dispatch({ type: 'FULL_STATE_SYNC', payload: data }))
+        .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/system-ws`; 
+    
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        switch (msg.type) {
+            case 'LOCK_STATUS':
+                if (msg.user !== sessionUser) {
+                    dispatch({ type: 'LOCK_STATUS_CHANGE', payload: { isLocked: msg.isLocked, user: msg.user } });
+                }
+                break;
+            case 'LOCK_GRANTED':
+                dispatch({ type: 'SET_EDITING_MODE', payload: true });
+                break;
+            case 'LOCK_DENIED':
+                triggerError(`Usuário ${msg.user} está editando agora. Aguarde.`);
+                break;
+            case 'LAYOUT_UPDATED':
+                dispatch({ type: 'FULL_STATE_SYNC', payload: msg.payload });
+                break;
+        }
+    };
+
+    return () => { if(ws.readyState === 1) ws.close(); };
+  }, [sessionUser]);
+
+  const requestLock = () => wsRef.current?.send(JSON.stringify({ type: 'REQUEST_LOCK', user: sessionUser }));
+  const releaseLock = () => { dispatch({ type: 'SET_EDITING_MODE', payload: false }); wsRef.current?.send(JSON.stringify({ type: 'RELEASE_LOCK' })); };
+  const saveLayout = () => {
+      const { isEditing, isLockedByOther, lockedBy, ...payload } = state;
+      wsRef.current?.send(JSON.stringify({ type: 'SAVE_LAYOUT', payload }));
+  };
+
+  const toggleSettings = () => state.showSettings ? releaseLock() : requestLock();
 
   const value: LayoutContextType = {
     ...state,
@@ -157,7 +201,7 @@ export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     reorderMedia: (key, start, end) => dispatch({ type: 'REORDER_MEDIA', payload: { key, startIndex: start, endIndex: end } }),
     addAnnouncement: (item) => dispatch({ type: 'ADD_ANNOUNCEMENT', payload: item }),
     removeAnnouncement: (id) => dispatch({ type: 'REMOVE_ANNOUNCEMENT', payload: id }),
-    toggleSettings: () => dispatch({ type: 'TOGGLE_SETTINGS' }),
+    toggleSettings, requestLock, releaseLock, saveLayout,
     updateLayout: (s) => dispatch({ type: 'UPDATE_LAYOUT', payload: s }),
     updateConnectionConfig: (s) => dispatch({ type: 'UPDATE_CONNECTION_CONFIG', payload: s }),
     addWindow: (name) => dispatch({ type: 'ADD_WINDOW', payload: { name } }),

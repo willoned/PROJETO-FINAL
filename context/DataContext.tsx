@@ -85,6 +85,13 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(dataReducer, initialState);
   const [isStale, setIsStale] = useState(false);
+  
+  // NOTE: We access LayoutContext via hook at component level if needed, 
+  // but DataContext usually initializes BEFORE Layout data is fully ready.
+  // We need lineConfigs to map data. To avoid circular dependencies, 
+  // we will pass lineConfigs into the dispatch from a separate effect in App.tsx 
+  // OR we accept that DataContext uses the constant INITIAL_LINES until updated.
+  // However, here we import useLayoutContext. 
   const { connectionConfig, lineConfigs } = useLayoutContext();
 
   // Connection Logic
@@ -115,11 +122,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [state.lastHeartbeat]);
 
   const clearError = () => dispatch({ type: 'SET_ERROR', payload: null });
+  const setError = (msg: string) => {
+      dispatch({ type: 'SET_ERROR', payload: msg });
+      // Auto clear after 10s for locks
+      setTimeout(() => clearError(), 10000);
+  };
 
   const value: DataContextType = {
     ...state,
     isStale,
-    clearError
+    clearError,
+    setError
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

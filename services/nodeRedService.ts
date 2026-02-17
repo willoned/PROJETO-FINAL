@@ -1,32 +1,29 @@
+
 import { APP_CONFIG } from '../constants';
 import { NodeRedPayload } from '../types';
 
-/**
- * PRODUCTION WEBSOCKET SERVICE
- */
-
 type MessageCallback = (data: NodeRedPayload | NodeRedPayload[]) => void;
 type StatusCallback = (status: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'ERROR') => void;
-type ErrorCallback = (errorMsg: string) => void;
+type ErrorCallback = (error: string) => void;
 
 class NodeRedService {
   private ws: WebSocket | null = null;
   private reconnectTimeout: number | null = null;
-  private isIntentionalClose = false;
-  private listeners: MessageCallback[] = [];
-  private debugListeners: ((data: any) => void)[] = [];
-  private statusListeners: StatusCallback[] = [];
-  private errorListeners: ErrorCallback[] = [];
   private url: string;
+  
+  // Stored callbacks
+  private onMessage: MessageCallback | null = null;
+  private onStatusChange: StatusCallback | null = null;
+  private onError: ErrorCallback | null = null;
 
   constructor() {
     this.url = APP_CONFIG.WS_URL;
   }
 
   public connect(onMessage: MessageCallback, onStatusChange: StatusCallback, onError?: ErrorCallback) {
-    this.listeners.push(onMessage);
-    this.statusListeners.push(onStatusChange);
-    if (onError) this.errorListeners.push(onError);
+    this.onMessage = onMessage;
+    this.onStatusChange = onStatusChange;
+    this.onError = onError || null;
 
     if (this.ws?.readyState === WebSocket.OPEN) {
       onStatusChange('CONNECTED');
@@ -34,22 +31,15 @@ class NodeRedService {
       this.initWebSocket();
     }
 
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== onMessage);
-      this.statusListeners = this.statusListeners.filter(l => l !== onStatusChange);
-      if (onError) this.errorListeners = this.errorListeners.filter(l => l !== onError);
-    };
+    return () => this.disconnect();
   }
 
-  public subscribeDebug(onRawData: (data: any) => void) {
-    this.debugListeners.push(onRawData);
-    return () => {
-        this.debugListeners = this.debugListeners.filter(l => l !== onRawData);
-    };
-  }
-
-  public updateConnectionConfig(url: string) {
-    if (this.url === url) return;
+  public updateConnectionConfig(url: string, onMessage?: MessageCallback, onStatusChange?: StatusCallback) {
+    if (onMessage) this.onMessage = onMessage;
+    if (onStatusChange) this.onStatusChange = onStatusChange;
+    
+    if (this.url === url && this.ws?.readyState === WebSocket.OPEN) return;
+    
     this.url = url;
     this.disconnect();
     this.initWebSocket();
@@ -57,18 +47,20 @@ class NodeRedService {
 
   private initWebSocket() {
     if (this.ws) {
-      this.ws.close();
+        this.ws.onclose = null;
+        this.ws.onerror = null;
+        this.ws.onmessage = null;
+        this.ws.close();
     }
 
-    this.isIntentionalClose = false;
-    this.notifyStatus('CONNECTING');
+    this.onStatusChange?.('CONNECTING');
 
     try {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log('[WS] Connected to Industrial Bridge');
-        this.notifyStatus('CONNECTED');
+        console.log('[WS] Connected to Node-RED');
+        this.onStatusChange?.('CONNECTED');
         if (this.reconnectTimeout) {
           clearTimeout(this.reconnectTimeout);
           this.reconnectTimeout = null;
@@ -77,35 +69,27 @@ class NodeRedService {
 
       this.ws.onmessage = (event) => {
         try {
-          const raw = JSON.parse(event.data);
-          // Cast raw to typed payload (Runtime validation could be added here for extra safety)
-          const data: NodeRedPayload | NodeRedPayload[] = raw;
-          
-          this.notifyListeners(data);
-          this.notifyDebug(data);
+          const data = JSON.parse(event.data);
+          this.onMessage?.(data);
         } catch (e) {
-          console.error('[WS] Parse error');
-          this.notifyDebug({ error: 'JSON Parse Error', raw: event.data });
+          console.error('[WS] JSON Parse error');
+          this.onError?.('JSON Parse Error');
         }
       };
 
-      this.ws.onclose = (event) => {
-        if (!this.isIntentionalClose) {
-          this.notifyStatus('DISCONNECTED');
-          this.scheduleReconnect();
-        } else {
-            this.notifyStatus('DISCONNECTED');
-        }
+      this.ws.onclose = () => {
+        this.onStatusChange?.('DISCONNECTED');
+        this.scheduleReconnect();
       };
 
       this.ws.onerror = () => {
-        this.notifyStatus('ERROR');
-        this.notifyError('Falha na conexão com o servidor WebSocket.');
+        this.onStatusChange?.('ERROR');
+        this.onError?.('Connection Error');
       };
 
     } catch (e) {
-      this.notifyStatus('ERROR');
-      this.notifyError(`Exception: ${e instanceof Error ? e.message : 'Unknown'}`);
+      this.onStatusChange?.('ERROR');
+      this.onError?.('Connection Failed');
       this.scheduleReconnect();
     }
   }
@@ -119,8 +103,8 @@ class NodeRedService {
   }
 
   public disconnect() {
-    this.isIntentionalClose = true;
     if (this.ws) {
+      this.ws.onclose = null; 
       this.ws.close();
       this.ws = null;
     }
@@ -128,22 +112,6 @@ class NodeRedService {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
-  }
-
-  private notifyListeners(data: NodeRedPayload | NodeRedPayload[]) {
-    this.listeners.forEach(l => l(data));
-  }
-
-  private notifyDebug(data: any) {
-    this.debugListeners.forEach(l => l(data));
-  }
-
-  private notifyStatus(status: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'ERROR') {
-    this.statusListeners.forEach(l => l(status));
-  }
-
-  private notifyError(msg: string) {
-    this.errorListeners.forEach(l => l(msg));
   }
 }
 
