@@ -21,23 +21,39 @@ const InternalHeader = () => {
         return () => clearInterval(t);
     }, []);
 
-    const { title, subtitle, textColor, backgroundColor, alignment } = layout.header;
+    const { title, subtitle, textColor, backgroundColor, alignment, logoUrl } = layout.header;
 
     return (
         <header 
             className="flex items-center px-6 py-2 border-b h-20 shrink-0 select-none transition-colors duration-500 border-brewery-border z-40 relative shadow-lg"
             style={{ backgroundColor: layout.isPartyMode ? '#3b0764' : backgroundColor }}
         >
+            {/* Branding / Watermark */}
+            <div className={`absolute top-1/2 -translate-y-1/2 flex flex-col justify-center pointer-events-none select-none z-30 ${alignment === 'CENTER' ? 'left-6 items-start' : 'left-1/2 -translate-x-1/2 items-center'}`}>
+                <span className="font-mono font-black text-lg text-brewery-accent tracking-widest leading-none drop-shadow-md">&lt;ITF-TEch\&gt;</span>
+                <span className="text-[9px] text-white/50 uppercase tracking-[0.2em] font-medium mt-0.5">produced by Willon Eduardo</span>
+            </div>
+
             {/* Title Container - Conditional Positioning */}
             <div className={`flex flex-col justify-center ${alignment === 'CENTER' ? 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center' : 'flex-1 text-left'}`}>
-                <h1 className="text-xl md:text-3xl font-black tracking-tight whitespace-nowrap" style={{ color: textColor }}>
-                    {layout.isPartyMode ? (layout.partyMessage || 'FESTA!') : title}
-                </h1>
-                {!layout.isPartyMode && subtitle && (
-                    <p className="text-sm uppercase opacity-70 font-medium tracking-widest" style={{ color: textColor }}>
-                        {subtitle}
-                    </p>
-                )}
+                <div className="flex items-center gap-4">
+                     {/* Optional Header Logo - Rendered only if uploaded */}
+                     {logoUrl && (
+                         <div className="h-12 w-auto max-w-[150px] shrink-0">
+                             <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+                         </div>
+                     )}
+                     <div>
+                        <h1 className="text-xl md:text-3xl font-black tracking-tight whitespace-nowrap" style={{ color: textColor }}>
+                            {layout.isPartyMode ? (layout.partyMessage || 'FESTA!') : title}
+                        </h1>
+                        {!layout.isPartyMode && subtitle && (
+                            <p className="text-sm uppercase opacity-70 font-medium tracking-widest" style={{ color: textColor }}>
+                                {subtitle}
+                            </p>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Spacer for Left alignment to push icons to right */}
@@ -207,7 +223,7 @@ const CanvasLayout = () => {
 
         {/* Scrollable Container with Massive Size for Large TVs */}
         <div className="absolute inset-0 overflow-auto custom-scrollbar bg-black/5">
-            {isEditing && isAuthenticated && <div className="absolute inset-0 z-0 opacity-10 pointer-events-none w-[5000px] h-[3000px]" style={{ backgroundImage: 'radial-gradient(#f59e0b 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>}
+            {isEditing && isAuthenticated && <div className="absolute inset-0 z-0 opacity-10 pointer-events-none w-[5000px] h-[3000px]" style={{ backgroundImage: 'radial-gradient(#f59e0b 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>}
             
             {/* Extended Width/Height to support 4K positioning */}
             <div className="w-[5000px] h-[3000px] relative"> 

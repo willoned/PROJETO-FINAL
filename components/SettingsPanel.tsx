@@ -6,7 +6,7 @@ import {
   Settings as SettingsIcon, PartyPopper, Type, Plus, Image, Video, Globe, 
   AlertTriangle, AlertOctagon, Info, User as UserIcon, Lock, Users, LogOut, CheckSquare, Square,
   Maximize, Move, Type as TypeIcon, Hash, Beer, AlignLeft, AlignCenter, Minus, Upload, Eye, EyeOff,
-  Calendar, Clock as ClockIcon
+  Calendar, Clock as ClockIcon, ChevronDown, ChevronUp, Tag
 } from 'lucide-react';
 import { MediaType, AnnouncementType, MediaItem, PermissionTab, UserRole, PartyEffect } from '../types';
 
@@ -94,7 +94,8 @@ const SettingsPanel: React.FC = () => {
   const [newAlertStart, setNewAlertStart] = useState('');
   const [newAlertEnd, setNewAlertEnd] = useState('');
 
-  const [newWindowName, setNewWindowName] = useState('');
+  // UI State for expandable mapping section
+  const [expandedMappingId, setExpandedMappingId] = useState<string | null>(null);
 
   const PERMISSION_LABELS: Record<PermissionTab, string> = {
     LINES: 'Linhas de Produção',
@@ -117,6 +118,15 @@ const SettingsPanel: React.FC = () => {
     BONUS: 'CHUVA DE DINHEIRO',
     GOAL: 'GOL DE PLACA',
     CUSTOM: 'PERSONALIZADO (IMG/GIF)'
+  };
+
+  const DISPLAY_LABELS: Record<string, string> = {
+      showVolume: 'Volume Total',
+      showPB: 'Eficiência (%)',
+      showHourly: 'Prod. Horária',
+      showTemp: 'Temperatura',
+      showTrend: 'Gráfico de Área',
+      showBarChart: 'Gráfico de Barras'
   };
 
   const getTabs = () => {
@@ -223,6 +233,18 @@ const SettingsPanel: React.FC = () => {
           updateLayout({ customPartyImage: url });
       }
   };
+  
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'WIDGET' | 'HEADER') => {
+      if (e.target.files && e.target.files.length > 0) {
+          const file = e.target.files[0];
+          const url = URL.createObjectURL(file);
+          if (target === 'WIDGET') {
+              updateLayout({ logoWidget: { ...layout.logoWidget, url } });
+          } else {
+              updateLayout({ header: { ...layout.header, logoUrl: url } });
+          }
+      }
+  };
 
   const handleAddAlert = () => {
       if (!newAlertMsg) return;
@@ -327,7 +349,7 @@ const SettingsPanel: React.FC = () => {
             {/* Content Area */}
             <div className="flex-1 bg-[#120c0c] overflow-y-auto p-10 custom-scrollbar">
                 
-                {/* --- USERS TAB (New Implementation) --- */}
+                {/* --- USERS TAB --- */}
                 {activeTab === 'USERS' && (
                   <div className="space-y-8 max-w-5xl mx-auto">
                       <SectionHeader title="Usuários & Permissões" desc="Gerencie quem tem acesso ao painel e quais áreas podem modificar." />
@@ -443,7 +465,7 @@ const SettingsPanel: React.FC = () => {
                   </div>
                 )}
                 
-                {/* --- LAYOUT TAB (Refactored) --- */}
+                {/* --- LAYOUT TAB --- */}
                 {activeTab === 'LAYOUT' && (
                     <div className="space-y-8 max-w-5xl mx-auto">
                         <SectionHeader title="Layout & Telas" desc="Controle global dos elementos, posicionamento e redimensionamento independente." />
@@ -457,7 +479,7 @@ const SettingsPanel: React.FC = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             {/* Logo Settings */}
                             <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Beer size={20} className="text-brewery-accent"/> Logotipo Personalizado</h3>
+                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Beer size={20} className="text-brewery-accent"/> Logotipo Personalizado (Widget Flutuante)</h3>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <NumberInput label="Posição X" value={layout.logoWidget.x} onChange={v => updateLayout({ logoWidget: { ...layout.logoWidget, x: v } })} />
@@ -467,7 +489,18 @@ const SettingsPanel: React.FC = () => {
                                     </div>
                                     <div className="pt-2">
                                         <label className="text-xs uppercase font-bold text-zinc-500 mb-1 block">URL da Imagem</label>
-                                        <input className="w-full bg-zinc-900 border border-white/10 rounded-lg p-2 text-white text-xs" placeholder="https://..." value={layout.logoWidget.url || ''} onChange={e => updateLayout({ logoWidget: { ...layout.logoWidget, url: e.target.value } })} />
+                                        <div className="flex gap-2">
+                                            <input className="w-full bg-zinc-900 border border-white/10 rounded-lg p-2 text-white text-xs" placeholder="https://..." value={layout.logoWidget.url || ''} onChange={e => updateLayout({ logoWidget: { ...layout.logoWidget, url: e.target.value } })} />
+                                            <label className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 rounded-lg flex items-center justify-center cursor-pointer border border-white/10 transition-colors" title="Carregar do Dispositivo">
+                                                <Upload size={18} />
+                                                <input 
+                                                    type="file" 
+                                                    className="hidden" 
+                                                    accept="image/*" 
+                                                    onChange={(e) => handleLogoUpload(e, 'WIDGET')} 
+                                                />
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -491,7 +524,7 @@ const SettingsPanel: React.FC = () => {
                     </div>
                 )}
 
-                {/* --- MEDIA TAB (Refactored) --- */}
+                {/* --- MEDIA TAB --- */}
                 {activeTab === 'MEDIA' && (
                     <div className="space-y-8 max-w-5xl mx-auto">
                         <SectionHeader title="Mídia & Menu" desc="Gerencie as playlists das janelas flutuantes e banners." />
@@ -624,7 +657,7 @@ const SettingsPanel: React.FC = () => {
                     </div>
                 )}
 
-                {/* --- ALERTS TAB (Refactored) --- */}
+                {/* --- ALERTS TAB --- */}
                 {activeTab === 'ALERTS' && (
                     <div className="space-y-8 max-w-5xl mx-auto">
                         <SectionHeader title="Avisos Gerais" desc="Gerencie o ticker de notícias, popups e a aparência da barra de avisos." />
@@ -704,7 +737,7 @@ const SettingsPanel: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Ticker Appearance Column (Requested Feature) */}
+                            {/* Ticker Appearance Column */}
                             <div className="space-y-6">
                                 <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6 h-full">
                                     <h3 className="font-bold text-white mb-6 flex items-center gap-2"><LayoutTemplate size={20} className="text-brewery-accent"/> Aparência da Barra</h3>
@@ -759,7 +792,7 @@ const SettingsPanel: React.FC = () => {
                     </div>
                 )}
 
-                {/* --- PARTY TAB (Refactored) --- */}
+                {/* --- PARTY TAB --- */}
                 {activeTab === 'PARTY' && (
                     <div className="space-y-8 max-w-5xl mx-auto">
                         <SectionHeader title="Modo Festa" desc="Efeitos visuais imersivos para comemorações." />
@@ -870,6 +903,30 @@ const SettingsPanel: React.FC = () => {
                                 </div>
                              )}
                         </div>
+                        
+                        {/* New: Header Logo Section */}
+                        <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6 mb-6">
+                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Image size={20} className="text-brewery-accent"/> Logotipo do Cabeçalho</h3>
+                            <div className="space-y-4">
+                                <div className="flex gap-2">
+                                    <input 
+                                        className="w-full bg-zinc-900 border border-white/10 rounded-lg p-2 text-white text-xs" 
+                                        placeholder="URL da Imagem..." 
+                                        value={layout.header.logoUrl || ''} 
+                                        onChange={e => updateLayout({ header: { ...layout.header, logoUrl: e.target.value } })} 
+                                    />
+                                    <label className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 rounded-lg flex items-center justify-center cursor-pointer border border-white/10 transition-colors" title="Carregar do Dispositivo">
+                                        <Upload size={18} />
+                                        <input 
+                                            type="file" 
+                                            className="hidden" 
+                                            accept="image/*" 
+                                            onChange={(e) => handleLogoUpload(e, 'HEADER')} 
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="space-y-4">
                             <div>
@@ -933,7 +990,81 @@ const SettingsPanel: React.FC = () => {
                                         </div>
                                         <button onClick={() => removeLine(line.id)} className="ml-4 p-2 bg-rose-950/30 text-rose-500 hover:bg-rose-500 hover:text-white rounded transition-colors"><Trash2 size={20}/></button>
                                     </div>
-                                    <div className="border-t border-white/5 pt-4"><label className="text-xs font-bold text-brewery-accent mb-2 block">Visibilidade</label><div className="flex flex-wrap gap-4">{Object.entries(line.display).map(([key, val]) => (<label key={key} className="flex items-center gap-2 cursor-pointer select-none"><input type="checkbox" checked={val} onChange={(e) => updateLine(line.id, { display: { ...line.display, [key]: e.target.checked } })} className="accent-brewery-accent" /><span className="text-sm text-zinc-400 capitalize">{key.replace('show', '')}</span></label>))}</div></div>
+                                    <div className="border-t border-white/5 pt-4"><label className="text-xs font-bold text-brewery-accent mb-2 block">Visibilidade</label><div className="flex flex-wrap gap-4">{Object.entries(line.display).map(([key, val]) => (<label key={key} className="flex items-center gap-2 cursor-pointer select-none"><input type="checkbox" checked={val} onChange={(e) => updateLine(line.id, { display: { ...line.display, [key]: e.target.checked } })} className="accent-brewery-accent" /><span className="text-sm text-zinc-400 capitalize">{DISPLAY_LABELS[key] || key.replace('show', '')}</span></label>))}</div></div>
+
+                                    {/* Data Mapping Section */}
+                                    <div className="border-t border-white/5 pt-2 mt-2">
+                                        <button 
+                                            onClick={() => setExpandedMappingId(expandedMappingId === line.id ? null : line.id)} 
+                                            className="w-full flex items-center justify-between py-2 text-xs font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-wider"
+                                        >
+                                            <span className="flex items-center gap-2"><Database size={14} /> Configurar Mapeamento de Tags (JSON)</span>
+                                            {expandedMappingId === line.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                        </button>
+
+                                        {expandedMappingId === line.id && (
+                                            <div className="grid grid-cols-2 gap-4 mt-2 p-4 bg-black/20 rounded-xl border border-white/5 animate-in slide-in-from-top-2">
+                                                <div className="col-span-2 text-[10px] text-zinc-500 italic mb-2 flex items-center gap-2">
+                                                    <Tag size={12}/>
+                                                    Defina as chaves do JSON recebido pelo Node-RED que correspondem a cada métrica.
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tag de Status</label>
+                                                    <input 
+                                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-emerald-400 font-mono text-xs focus:border-emerald-500 outline-none" 
+                                                        placeholder="Ex: status"
+                                                        value={line.dataMapping?.statusKey || ''} 
+                                                        onChange={e => updateLine(line.id, { dataMapping: { ...line.dataMapping, statusKey: e.target.value } })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tag de Temperatura</label>
+                                                    <input 
+                                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-amber-400 font-mono text-xs focus:border-amber-500 outline-none" 
+                                                        placeholder="Ex: temp_c"
+                                                        value={line.dataMapping?.temperatureKey || ''} 
+                                                        onChange={e => updateLine(line.id, { dataMapping: { ...line.dataMapping, temperatureKey: e.target.value } })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tag de Produção</label>
+                                                    <input 
+                                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-blue-400 font-mono text-xs focus:border-blue-500 outline-none" 
+                                                        placeholder="Ex: count"
+                                                        value={line.dataMapping?.productionKey || ''} 
+                                                        onChange={e => updateLine(line.id, { dataMapping: { ...line.dataMapping, productionKey: e.target.value } })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tag de Velocidade</label>
+                                                    <input 
+                                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-indigo-400 font-mono text-xs focus:border-indigo-500 outline-none" 
+                                                        placeholder="Ex: speed"
+                                                        value={line.dataMapping?.speedKey || ''} 
+                                                        onChange={e => updateLine(line.id, { dataMapping: { ...line.dataMapping, speedKey: e.target.value } })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tag de Eficiência</label>
+                                                    <input 
+                                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-purple-400 font-mono text-xs focus:border-purple-500 outline-none" 
+                                                        placeholder="Ex: oee"
+                                                        value={line.dataMapping?.efficiencyKey || ''} 
+                                                        onChange={e => updateLine(line.id, { dataMapping: { ...line.dataMapping, efficiencyKey: e.target.value } })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tag de Rejeitos</label>
+                                                    <input 
+                                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-rose-400 font-mono text-xs focus:border-rose-500 outline-none" 
+                                                        placeholder="Ex: rejects"
+                                                        value={line.dataMapping?.rejectKey || ''} 
+                                                        onChange={e => updateLine(line.id, { dataMapping: { ...line.dataMapping, rejectKey: e.target.value } })} 
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                          </div>

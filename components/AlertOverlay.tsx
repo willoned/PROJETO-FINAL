@@ -75,10 +75,10 @@ const AlertOverlay: React.FC = () => {
     const style = getStyles();
 
     return (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-10 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-6 md:p-10 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
             <div className={`
-                w-full max-w-5xl aspect-video md:aspect-auto md:min-h-[70vh]
-                flex flex-col items-center justify-center text-center p-12 rounded-3xl border-[6px]
+                w-full max-w-6xl aspect-video md:aspect-auto md:min-h-[60vh]
+                flex flex-col items-center justify-center text-center p-8 md:p-16 rounded-3xl border-[6px]
                 ${style.bg} ${style.border} ${style.glow} ${style.animation}
                 shadow-2xl relative overflow-hidden
             `}>
@@ -87,31 +87,25 @@ const AlertOverlay: React.FC = () => {
                      style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%, #000), repeating-linear-gradient(45deg, #000 25%, #000 25%, #000 75%, #000 75%, #000)', backgroundSize: '20px 20px', backgroundPosition: '0 0, 10px 10px' }} 
                 />
 
-                <div className={`mb-8 ${style.iconColor} drop-shadow-2xl`}>
+                <div className={`mb-8 ${style.iconColor} drop-shadow-2xl shrink-0`}>
                     {style.icon}
                 </div>
 
-                <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-tight drop-shadow-lg mb-4 text-white">
-                    {activeAlert.type === 'CRITICAL' ? 'ALERTA CRÍTICO' : 
-                     activeAlert.type === 'WARNING' ? 'ATENÇÃO' :
-                     activeAlert.type === 'ATTENTION' ? 'COMUNICADO' : 'INFORMAÇÃO'}
-                </h1>
-
-                <div className="w-32 h-2 bg-white/20 rounded-full mb-8"></div>
-
-                <p className={`text-4xl md:text-6xl font-bold font-mono uppercase ${style.text} max-w-4xl leading-snug`}>
-                    {activeAlert.message}
-                </p>
+                <div className="flex-1 flex items-center justify-center w-full overflow-y-auto custom-scrollbar my-4">
+                    <p className={`text-4xl md:text-7xl font-black font-mono uppercase ${style.text} max-w-5xl leading-tight break-words whitespace-pre-wrap`}>
+                        {activeAlert.message}
+                    </p>
+                </div>
 
                 {/* EXIT BUTTON */}
                 <button
                     onClick={() => removeAnnouncement(activeAlert.id)}
-                    className="mt-16 group relative overflow-hidden bg-rose-600 hover:bg-rose-500 text-white font-black py-6 px-16 rounded-2xl text-2xl uppercase tracking-[0.2em] shadow-[0_0_40px_rgba(225,29,72,0.6)] animate-pulse hover:animate-none transition-all border-4 border-rose-400 hover:border-white hover:scale-105 active:scale-95 z-50 cursor-pointer"
+                    className="mt-8 group relative overflow-hidden bg-rose-600 hover:bg-rose-500 text-white font-black py-4 px-12 rounded-2xl text-xl uppercase tracking-[0.2em] shadow-[0_0_40px_rgba(225,29,72,0.6)] animate-pulse hover:animate-none transition-all border-4 border-rose-400 hover:border-white hover:scale-105 active:scale-95 z-50 cursor-pointer shrink-0"
                 >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_1s_infinite]" />
                     <span className="flex items-center gap-4 relative z-10">
-                        <X size={32} strokeWidth={4} />
-                        Fechar Aviso
+                        <X size={24} strokeWidth={4} />
+                        FECHAR
                     </span>
                 </button>
             </div>

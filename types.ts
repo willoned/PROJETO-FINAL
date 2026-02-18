@@ -111,6 +111,7 @@ export interface HeaderSettings {
   topMediaHeight: number;
   topMediaBorderWidth: number;
   alignment: 'LEFT' | 'CENTER';
+  logoUrl?: string;
 }
 
 export interface LogoWidgetSettings {

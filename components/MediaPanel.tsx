@@ -18,6 +18,7 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Timer State (Remaining Seconds)
   const [timeLeft, setTimeLeft] = useState(0);
@@ -27,17 +28,6 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
   // Zoom State
   const [zoomLevel, setZoomLevel] = useState(1);
   const contentRef = useRef<HTMLDivElement>(null);
-
-  // Track created URLs to revoke them on unmount to prevent memory leaks
-  const createdUrls = useRef<Set<string>>(new Set());
-
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      createdUrls.current.forEach((url) => URL.revokeObjectURL(url));
-      createdUrls.current.clear();
-    };
-  }, []);
 
   const itemToRender = mediaPlaylist[currentIndex];
 
@@ -109,33 +99,52 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
 
   const processFiles = useCallback((files: FileList | null) => {
     if (!files || !isAuthenticated) return; // Guard: No adding files if not auth
+    
+    setIsUploading(true);
 
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach(async (file) => {
       const isVideo = file.type.startsWith('video/');
       const isImage = file.type.startsWith('image/');
       const isHtml = file.type === 'text/html' || file.name.endsWith('.html') || file.name.endsWith('.htm');
 
       if (!isVideo && !isImage && !isHtml) return;
 
-      const url = URL.createObjectURL(file);
-      createdUrls.current.add(url); // Track for cleanup
-
       let type: 'VIDEO' | 'IMAGE' | 'HTML' = 'IMAGE';
       if (isVideo) type = 'VIDEO';
       if (isHtml) type = 'HTML';
       
-      addMedia(playlistKey, {
-        id: Date.now().toString() + Math.random().toString().slice(2),
-        name: file.name,
-        type,
-        url,
-        duration: isHtml ? 30 : 10 // Default 30s for HTML, 10s for images
-      });
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            addMedia(playlistKey, {
+                id: Date.now().toString() + Math.random().toString().slice(2),
+                name: file.name,
+                type,
+                url: data.url, // Persistent URL from server
+                duration: isHtml ? 30 : 10 // Default 30s for HTML, 10s for images
+            });
+        } else {
+            console.error('Failed to upload file:', file.name);
+        }
+      } catch (error) {
+        console.error('Error uploading file:', error);
+      }
     });
+
+    setIsUploading(false);
   }, [addMedia, playlistKey, isAuthenticated]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     processFiles(e.target.files);
+    e.target.value = ''; // Reset input to allow re-uploading same file
   };
 
   // Drag and Drop Handlers
@@ -183,8 +192,8 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
         <div className="pointer-events-none flex flex-col items-center">
             {isAuthenticated ? (
                 <>
-                    <Upload className={`mb-4 transition-colors ${isDragging ? 'text-indigo-400' : 'text-zinc-600 group-hover:text-indigo-500'}`} size={48} />
-                    <h3 className="text-zinc-400 font-medium">{isDragging ? 'Solte os arquivos aqui' : 'Playlist Vazia'}</h3>
+                    <Upload className={`mb-4 transition-colors ${isDragging ? 'text-indigo-400' : 'text-zinc-600 group-hover:text-indigo-500'} ${isUploading ? 'animate-bounce' : ''}`} size={48} />
+                    <h3 className="text-zinc-400 font-medium">{isDragging ? 'Solte os arquivos aqui' : isUploading ? 'Enviando...' : 'Playlist Vazia'}</h3>
                     <p className="text-zinc-600 text-xs mt-1 mb-4 text-center">Arraste arquivos ou clique para adicionar.<br/>Suporta Imagens, Vídeos e HTML.</p>
                 </>
             ) : (
@@ -330,7 +339,7 @@ const MediaPanel: React.FC<Props> = ({ playlistKey }) => {
             </button>
             
             <label className="p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl cursor-pointer shadow-xl shadow-indigo-900/40 transition-all hover:scale-105" title="Adicionar Mídia">
-            <Upload size={20} />
+            <Upload size={20} className={isUploading ? 'animate-bounce' : ''}/>
             <input type="file" className="hidden" multiple accept="image/*,video/*,text/html,.html,.htm" onChange={handleFileUpload} />
             </label>
         </div>
